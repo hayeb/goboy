@@ -30,10 +30,15 @@ func initRegisters() register {
 	return register{0, 0, 0, 0, 0, 0, 0, 0, 0, 0,flags{false, false, false, false} }
 }
 
+func displayCartridgeInformation(cartridgeInfo CartridgeInfo ) {
+	spew.Dump(cartridgeInfo)
+}
+
 func Run(bootrom []byte, cartridge []byte) {
-	registers := initRegisters()
-	memory := memInit()
-	spew.Dump(registers)
-	spew.Dump(memory)
+	displayCartridgeInformation(GetCartridgeInfo(cartridge));
+	//registers := initRegisters()
+	//memory := memInit()
+	//spew.Dump(registers)
+	//spew.Dump(memory)
 
 }
