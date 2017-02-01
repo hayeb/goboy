@@ -3,8 +3,8 @@ package gameboy
 import "fmt"
 
 type memory struct {
-	bank_0                    [16 * 1000]uint8 // 0x0000 (16 kB)
-	switchable_rom_bank       [16 * 1000]uint8 // 0x4000 (16 kB)
+	bank_0                    []uint8 // 0x0000 (16 kB)
+	switchable_rom_bank       []uint8 // 0x4000 (16 kB)
 	video_ram                 [8 * 1000]uint8 // 0x8000 (8 kB)
 	switchable_ram_bank       [8 * 1000]uint8 // 0xA000 (8 kB)
 	internal_ram_8kb          [8 * 1000]uint8 // 0xC000 (8 kB)
@@ -32,21 +32,26 @@ const (
 	INTERRUPT_ENABLE_REGISTER = 11
 )
 
-func memInit() memory {
-	return memory{
-		[16 * 1000]uint8{},
-		[16 * 1000]uint8{},
-		[8 * 1000]uint8{},
-		[8 * 1000]uint8{},
-		[8 * 1000]uint8{},
-		[8 * 1000]uint8{},
-		[7680]uint8{},
-		[96]uint8{},
-		[67]uint8{},
-		[52]uint8{},
-		[127]uint8{},
-		0,
+func memInit(cartridgeTypeCode CartridgeTypeCode, cartridge []uint8) memory {
+	if (cartridgeTypeCode == ROM_ONLY) {
+		return memory{
+			cartridge[0:len(cartridge)/2],
+			cartridge[len(cartridge)/2:],
+			[8 * 1000]uint8{},
+			[8 * 1000]uint8{},
+			[8 * 1000]uint8{},
+			[8 * 1000]uint8{},
+			[7680]uint8{},
+			[96]uint8{},
+			[67]uint8{},
+			[52]uint8{},
+			[127]uint8{},
+			0,
+		}
+	} else {
+		panic(fmt.Sprintf("Cartridge type %s not supported yet by memory module", typeCodeString(cartridgeTypeCode)))
 	}
+
 }
 
 func map_addr(addr  uint16) int {

@@ -1,8 +1,10 @@
 package gameboy
 
 import (
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 )
+
 type flags struct {
 	Z bool
 	N bool
@@ -30,15 +32,29 @@ func initRegisters() register {
 	return register{0, 0, 0, 0, 0, 0, 0, 0, 0, 0,flags{false, false, false, false} }
 }
 
-func displayCartridgeInformation(cartridgeInfo CartridgeInfo ) {
-	spew.Dump(cartridgeInfo)
-}
-
 func Run(bootrom []byte, cartridge []byte) {
-	displayCartridgeInformation(GetCartridgeInfo(cartridge));
-	//registers := initRegisters()
-	//memory := memInit()
-	//spew.Dump(registers)
-	//spew.Dump(memory)
+	defer func () {
+		if r := recover(); r != nil {
+			fmt.Printf("Encountered an error: %s", r)
+		}
+	}()
+	cartridgeInfo := GetCartridgeInfo(cartridge)
+	fmt.Println(CartridgeInfoString(cartridgeInfo))
+
+	if cartridgeInfo.RAMSize != RAM_NONE || cartridgeInfo.ROMSize != ROM_KBIT_256 {
+		panic("Cartridge not supported")
+	}
+
+	registers := initRegisters()
+
+
+
+	// TODO: First run bootrom, then load cartridge!
+
+	// Load the rom in memory locations 0x000 - 0x7FFF
+
+	memory := memInit(cartridgeInfo.CartType, cartridge)
+
+	// Run the boot rom
 
 }
