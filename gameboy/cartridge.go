@@ -5,6 +5,15 @@ import (
 	"fmt"
 )
 
+type CartridgeInfo struct {
+	Name         string
+	CartType     CartridgeTypeCode
+	System       GameBoyType
+	ROMSize      ROMSizeCode
+	RAMSize      RAMSizeCode
+	Localization string
+}
+
 type CartridgeTypeCode int
 const (
 	ROM_ONLY CartridgeTypeCode = iota
@@ -31,25 +40,97 @@ const (
 	HUDSON_HUC3
 )
 
+type RAMSizeCode int
+const (
+	RAM_NONE RAMSizeCode = iota
+	RAM_KBIT_16
+	RAM_KBIT_64
+	RAM_KBIT_256
+	RAM_MBIT_1
+)
+
+type ROMSizeCode int
+const (
+	ROM_KBIT_256 ROMSizeCode = iota
+	ROM_KBIT_512
+	ROM_MBIT_1
+	ROM_MBIT_2
+	ROM_MBIT_4
+	ROM_MBIT_8
+	ROM_MBIT_16
+)
 type GameBoyType int
 const (
 	GAMEBOY GameBoyType = iota
 	SUPER_GAMEBOY
 )
 
+func (cartInfo *CartridgeInfo) GameboyTypeString() string {
+	switch (cartInfo.System) {
+	case GAMEBOY: return "Gameboy"
+	case SUPER_GAMEBOY: return "Super Gameboy"
+	default: return ""
+	}
+}
+
+func (cartInfo *CartridgeInfo) CartridgeTypeCodeString() string {
+	switch (cartInfo.CartType) {
+	case ROM_ONLY: return "ROM Only"
+	case ROM_MBC1: return "ROM+MBC1"
+	case ROM_MBC1_RAM: return "ROM+MBC1+RAM"
+	case ROM_MBC1_RAM_BAT: return "ROM+MBC1+RAM+BATT"
+	case ROM_MBC2: return "ROM+MBC2"
+	case ROM_MBC2_BATT: return "ROM+MBC2+BATT"
+	case ROM_RAM: return "ROM+RAM"
+	case ROM_RAM_BATTERY: return "ROM+RAM+BATT"
+	case ROM_MMM01: return "ROM+MMM01"
+	case ROM_MMM01_SRAM: return "ROM+MMM01+SRAM"
+	case ROM_MMM01_SRAM_BATT: return "ROM+MMMM01+SRAM+BATT"
+	case ROM_MBC3_RAM: return "ROM+MBC3+RAM"
+	case ROM_MBC3_RAM_BATT: return "ROM+MNC3+RAM+BATT"
+	case ROM_MBC5: return "ROM~MBC5"
+	case ROM_MBC5_RAM: return "ROM+MBC5+RAM"
+	case ROM_MBC5_RAM_BATT: return "ROM+MBC5+RAM+BATT"
+	case ROM_MBC5_RUMBLE: return "ROM+MBC5+RUMBLE"
+	case ROM_MBC5_RUMBLE_SRAM: return "ROM+MBC5+RUMBLE+SRAM"
+	case ROM_MBC5_RUMBLE_SRAM_BATT: return "ROM+MBC5+RUMBLE+SRAM+BATT"
+	case POCKET_CAMERA: return "Pocket Camera"
+	case BANDAI_TAMA5: return "Bandai TAMA5"
+	case HUDSON_HUC3: return "Hudson HuC-3"
+	default:
+		return ""
+	}
+}
+
+func (cartInfo *CartridgeInfo) RomSizeCodeString() string {
+	switch (cartInfo.ROMSize) {
+	case ROM_KBIT_256: return "256 Kbit"
+	case ROM_KBIT_512: return "512 Kbit"
+	case ROM_MBIT_1: return "1 Mbit"
+	case ROM_MBIT_2: return "2 Mbit"
+	case ROM_MBIT_4: return "4 Mit"
+	case ROM_MBIT_8: return "8 Mbit"
+	case ROM_MBIT_16: return "16 Mbit"
+	default: return ""
+	}
+}
+
+func (cartInfo *CartridgeInfo) RamSizeCodeString() string {
+	switch (cartInfo.RAMSize) {
+	case RAM_NONE: return "None"
+	case RAM_KBIT_16: return "16 Kbit"
+	case RAM_KBIT_64: return "64 Kbit"
+	case RAM_KBIT_256: return "256 Kbit"
+	case RAM_MBIT_1: return "1 Mbit"
+	default: return ""
+	}
+}
+
 func gameboyType(typeCode uint8) GameBoyType {
 	switch (typeCode) {
 	case 0x00: return GAMEBOY
 	case 0x03: return SUPER_GAMEBOY
 	default: panic(fmt.Sprintf("Unknown system typecode %d", typeCode))
-	}
-}
-
-func gameboyTypeString(gameBoyType GameBoyType) string {
-	switch (gameBoyType) {
-	case GAMEBOY: return "Gameboy"
-	case SUPER_GAMEBOY: return "Super Gameboy"
-	default: panic(fmt.Sprintf("No string for unknown system typecode %d", gameBoyType))
 	}
 }
 
@@ -82,45 +163,7 @@ func typeCode(typeCode uint8) CartridgeTypeCode {
 	}
 }
 
-func typeCodeString(typecode CartridgeTypeCode) string {
-	switch (typecode) {
-	case ROM_ONLY: return "ROM Only"
-	case ROM_MBC1: return "ROM+MBC1"
-	case ROM_MBC1_RAM: return "ROM+MBC1+RAM"
-	case ROM_MBC1_RAM_BAT: return "ROM+MBC1+RAM+BATT"
-	case ROM_MBC2: return "ROM+MBC2"
-	case ROM_MBC2_BATT: return "ROM+MBC2+BATT"
-	case ROM_RAM: return "ROM+RAM"
-	case ROM_RAM_BATTERY: return "ROM+RAM+BATT"
-	case ROM_MMM01: return "ROM+MMM01"
-	case ROM_MMM01_SRAM: return "ROM+MMM01+SRAM"
-	case ROM_MMM01_SRAM_BATT: return "ROM+MMMM01+SRAM+BATT"
-	case ROM_MBC3_RAM: return "ROM+MBC3+RAM"
-	case ROM_MBC3_RAM_BATT: return "ROM+MNC3+RAM+BATT"
-	case ROM_MBC5: return "ROM~MBC5"
-	case ROM_MBC5_RAM: return "ROM+MBC5+RAM"
-	case ROM_MBC5_RAM_BATT: return "ROM+MBC5+RAM+BATT"
-	case ROM_MBC5_RUMBLE: return "ROM+MBC5+RUMBLE"
-	case ROM_MBC5_RUMBLE_SRAM: return "ROM+MBC5+RUMBLE+SRAM"
-	case ROM_MBC5_RUMBLE_SRAM_BATT: return "ROM+MBC5+RUMBLE+SRAM+BATT"
-	case POCKET_CAMERA: return "Pocket Camera"
-	case BANDAI_TAMA5: return "Bandai TAMA5"
-	case HUDSON_HUC3: return "Hudson HuC-3"
-	default:
-		panic(fmt.Sprintf("No string for unknown cartridge type %d", typecode ))
-	}
-}
 
-type ROMSizeCode int
-const (
-	ROM_KBIT_256 ROMSizeCode = iota
-	ROM_KBIT_512
-	ROM_MBIT_1
-	ROM_MBIT_2
-	ROM_MBIT_4
-	ROM_MBIT_8
-	ROM_MBIT_16
-)
 
 func romSizeCode(romcode uint8) ROMSizeCode {
 	switch (romcode) {
@@ -135,27 +178,9 @@ func romSizeCode(romcode uint8) ROMSizeCode {
 	}
 }
 
-func RomSizeCodeString(romcode ROMSizeCode) string {
-	switch (romcode) {
-	case ROM_KBIT_256: return "256 Kbit"
-	case ROM_KBIT_512: return "512 Kbit"
-	case ROM_MBIT_1: return "1 Mbit"
-	case ROM_MBIT_2: return "2 Mbit"
-	case ROM_MBIT_4: return "4 Mit"
-	case ROM_MBIT_8: return "8 Mbit"
-	case ROM_MBIT_16: return "16 Mbit"
-	default: panic(fmt.Sprintf("No rom size for code %d", romcode))
-	}
-}
 
-type RAMSizeCode int
-const (
-	RAM_NONE RAMSizeCode = iota
-	RAM_KBIT_16
-	RAM_KBIT_64
-	RAM_KBIT_256
-	RAM_MBIT_1
-)
+
+
 
 func ramSizeCode(ramSizeCode uint8) RAMSizeCode {
 	switch (ramSizeCode) {
@@ -168,17 +193,7 @@ func ramSizeCode(ramSizeCode uint8) RAMSizeCode {
 	}
 }
 
-func RamSizeCodeString(ramcode RAMSizeCode) string {
-	switch (ramcode) {
-	case RAM_NONE: return "None"
-	case RAM_KBIT_16: return "16 Kbit"
-	case RAM_KBIT_64: return "64 Kbit"
-	case RAM_KBIT_256: return "256 Kbit"
-	case RAM_MBIT_1: return "1 Mbit"
-	default: panic(fmt.Sprintf("No ram size for code %d", ramcode))
 
-	}
-}
 
 func cartridgeTitle(cartridge []byte) string {
 	title := ""
@@ -198,17 +213,10 @@ func localization(code uint8) string {
 	}
 }
 
-type CartridgeInfo struct {
-	Name         string
-	CartType     CartridgeTypeCode
-	System       GameBoyType
-	ROMSize      ROMSizeCode
-	RAMSize      RAMSizeCode
-	Localization string
-}
 
-func GetCartridgeInfo(cartridge []byte) CartridgeInfo{
-	return CartridgeInfo{
+
+func CreateCartridgeInfo(cartridge []byte) *CartridgeInfo{
+	return &CartridgeInfo{
 		Name: cartridgeTitle(cartridge),
 		CartType: typeCode(cartridge[0x147]),
 		System: gameboyType(cartridge[0x146]),
@@ -221,13 +229,11 @@ func GetCartridgeInfo(cartridge []byte) CartridgeInfo{
 func CartridgeInfoString(cartridgeInfo CartridgeInfo) string {
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("Cartridge name: %s\n", cartridgeInfo.Name))
-	buffer.WriteString(fmt.Sprintf("Cartridge type: %s\n", typeCodeString(cartridgeInfo.CartType)))
-	buffer.WriteString(fmt.Sprintf("System type: %s\n", gameboyTypeString(cartridgeInfo.System)))
-	buffer.WriteString(fmt.Sprintf("ROM size: %s\n", RomSizeCodeString(cartridgeInfo.ROMSize)))
-	buffer.WriteString(fmt.Sprintf("RAM size: %s\n", RamSizeCodeString(cartridgeInfo.RAMSize)))
+	buffer.WriteString(fmt.Sprintf("Cartridge type: %s\n", cartridgeInfo.CartridgeTypeCodeString()))
+	buffer.WriteString(fmt.Sprintf("System type: %s\n", cartridgeInfo.GameboyTypeString()))
+	buffer.WriteString(fmt.Sprintf("ROM size: %s\n", cartridgeInfo.RomSizeCodeString()))
+	buffer.WriteString(fmt.Sprintf("RAM size: %s\n", cartridgeInfo.RamSizeCodeString()))
 	buffer.WriteString(fmt.Sprintf("Localization: %s\n", cartridgeInfo.Localization))
 
 	return buffer.String()
-
-
 }

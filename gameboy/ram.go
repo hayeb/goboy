@@ -2,19 +2,19 @@ package gameboy
 
 import "fmt"
 
-type memory struct {
-	bank_0                    []uint8 // 0x0000 (16 kB)
-	switchable_rom_bank       []uint8 // 0x4000 (16 kB)
-	video_ram                 [8 * 1000]uint8 // 0x8000 (8 kB)
-	switchable_ram_bank       [8 * 1000]uint8 // 0xA000 (8 kB)
-	internal_ram_8kb          [8 * 1000]uint8 // 0xC000 (8 kB)
-	echo_internal_ram         [8 * 1000]uint8 // 0xE000 (8 kB)
-	sprite_attrib_memory      [7680]uint8 // 0xFE00 (7680 B)
-	empty1                    [96]uint8 // 0xFEA0 (96 B)
-	io_ports                  [67]uint8   // 0xFF00 (67 B)
-	empty2                    [52]uint8 // 0xFF4C (52 B)
-	internal_ram              [127]uint8 // 0xFF80 (127 B)
-	interrupt_enable_register uint8   // 0xFFFF (1 B)
+type Memory struct {
+	bank_0                    [16 * 1024]uint8 // 0x0000 (16 kB)
+	switchable_rom_bank       [16 * 1024]uint8 // 0x4000 (16 kB)
+	video_ram                 [8 * 1024]uint8  // 0x8000 (8 kB)
+	switchable_ram_bank       [8 * 1024]uint8  // 0xA000 (8 kB)
+	internal_ram_8kb          [8 * 1024]uint8  // 0xC000 (8 kB)
+	echo_internal_ram         [8 * 1024]uint8  // 0xE000 (8 kB)
+	sprite_attrib_memory      [7680]uint8      // 0xFE00 (7680 B)
+	empty1                    [96]uint8        // 0xFEA0 (96 B)
+	io_ports                  [67]uint8        // 0xFF00 (67 B)
+	empty2                    [52]uint8        // 0xFF4C (52 B)
+	internal_ram              [127]uint8       // 0xFF80 (127 B)
+	interrupt_enable_register uint8            // 0xFFFF (1 B)
 }
 
 const (
@@ -32,24 +32,24 @@ const (
 	INTERRUPT_ENABLE_REGISTER = 11
 )
 
-func memInit(cartridgeTypeCode CartridgeTypeCode, cartridge []uint8) memory {
-	if (cartridgeTypeCode == ROM_ONLY) {
-		return memory{
-			cartridge[0:len(cartridge)/2],
-			cartridge[len(cartridge)/2:],
-			[8 * 1000]uint8{},
-			[8 * 1000]uint8{},
-			[8 * 1000]uint8{},
-			[8 * 1000]uint8{},
-			[7680]uint8{},
-			[96]uint8{},
-			[67]uint8{},
-			[52]uint8{},
-			[127]uint8{},
-			0,
-		}
-	} else {
-		panic(fmt.Sprintf("Cartridge type %s not supported yet by memory module", typeCodeString(cartridgeTypeCode)))
+func memInit(bootrom []uint8) *Memory {
+	fb := [16 * 1024]uint8{}
+	for index, item := range bootrom {
+		fb[index] = item
+	}
+	return &Memory{
+		fb,
+		[16 * 1024]uint8{},
+		[8 * 1024]uint8{},
+		[8 * 1024]uint8{},
+		[8 * 1024]uint8{},
+		[8 * 1024]uint8{},
+		[7680]uint8{},
+		[96]uint8{},
+		[67]uint8{},
+		[52]uint8{},
+		[127]uint8{},
+		0,
 	}
 
 }
@@ -77,31 +77,56 @@ func map_addr(addr  uint16) int {
 		return EMPTY2
 	} else if addr >= 0xFF80 && addr < 0xFFFF {
 		return INTERNAL_RAM
-	} else if addr == 0xFFFF{
+	} else if addr == 0xFFFF {
 		return INTERRUPT_ENABLE_REGISTER
 	} else {
 		panic(fmt.Sprintf("Unknown memory address %x\n", addr))
 	}
 }
 
-func ReadMem(mem memory, addres uint16) uint8 {
-	switch (map_addr(addres)) {
-	case 1: return mem.bank_0[int(addres)]
-	case 2: return mem.bank_0[int(addres)]
-	case 3: return mem.bank_0[int(addres)]
-	case 4: return mem.bank_0[int(addres)]
-	case 5: return mem.bank_0[int(addres)]
-	case 6: return mem.bank_0[int(addres)]
-	case 7: return mem.bank_0[int(addres)]
-	case 8: return mem.bank_0[int(addres)]
-	case 9: return mem.bank_0[int(addres)]
-	case 10: return mem.bank_0[int(addres)]
-	case 11: return mem.bank_0[int(addres)]
-	}
-	// Should never execute
-	return 0
+func (mem Memory) LoadROM(cartridge []uint8) {
+
 }
 
-func WriteMem(mem memory, addres uint16, val uint8) {
+// TODO: Fix
+func (memory Memory) Read8(addres uint16) uint8 {
+	switch (map_addr(addres)) {
+	case 0: return memory.bank_0[addres]
+	case 1: return memory.switchable_rom_bank[addres - 0x4000]
+	case 2: return memory.bank_0[int(addres)]
+	case 3: return memory.bank_0[int(addres)]
+	case 4: return memory.bank_0[int(addres)]
+	case 5: return memory.bank_0[int(addres)]
+	case 6: return memory.bank_0[int(addres)]
+	case 7: return memory.bank_0[int(addres)]
+	case 8: return memory.bank_0[int(addres)]
+	case 9: return memory.bank_0[int(addres)]
+	case 10: return memory.bank_0[int(addres)]
+	default: panic(fmt.Sprintf("Read requested outside memory: %x", addres))
+	}
+}
+
+func (memory Memory) Read16(addres uint16) uint16 {
+	switch (map_addr(addres)) {
+	case 0: return uint16(memory.bank_0[addres]) | (uint16(memory.bank_0[addres + 1]) << 8)
+	case 1: return uint16(memory.switchable_rom_bank[addres - 0x4000])
+	case 2: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 3: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 4: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 5: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 6: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 7: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 8: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 9: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 10: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	default: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	}
+}
+
+func (memory Memory) Write8(Saddress uint16, val uint8) {
+
+}
+
+func (memory Memory) Write16(address uint16, val uint16) {
 
 }
