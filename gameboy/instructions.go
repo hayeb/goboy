@@ -1,12 +1,12 @@
 package gameboy
 
-type instruction struct {
+type Instruction struct {
 	name  string
 	bytes int
 }
 
-func CreateInstructionMap() *map[uint8]instruction {
-	return &map[uint8]instruction{
+func CreateInstructionMap() *map[uint8]Instruction {
+	return &map[uint8]Instruction{
 		0x21: {LD_HL, 3},
 		0x31: {LD_SP, 3},
 		0x32: {LDD_HL_A, 1},
@@ -16,9 +16,9 @@ func CreateInstructionMap() *map[uint8]instruction {
 }
 
 const (
-	CB = "CB"
-	LD_SP = "LD SP"
-	LD_HL = "LD_HL"
+	CB       = "CB"
+	LD_SP    = "LD SP"
+	LD_HL    = "LD_HL"
 	LDD_HL_A = "LDD_(HL)_A"
-	XOR_A = "XOR A"
+	XOR_A    = "XOR A"
 )

@@ -18,21 +18,21 @@ type Memory struct {
 }
 
 const (
-	BANK_0 = 0
-	SWITCHABLE_ROM_BANK = 1
-	VIDEO_RAM = 2
-	SWITCHABLE_RAM_BANK = 3
-	INTERNAL_RAM_8KB = 4
-	ECHO_INTERNAL_RAM = 5
-	SPRITE_ATTRIB_MEMORY = 6
-	EMPTY1 = 7
-	IO_PORTS = 8
-	EMPTY2 = 9
-	INTERNAL_RAM = 10
+	BANK_0                    = 0
+	SWITCHABLE_ROM_BANK       = 1
+	VIDEO_RAM                 = 2
+	SWITCHABLE_RAM_BANK       = 3
+	INTERNAL_RAM_8KB          = 4
+	ECHO_INTERNAL_RAM         = 5
+	SPRITE_ATTRIB_MEMORY      = 6
+	EMPTY1                    = 7
+	IO_PORTS                  = 8
+	EMPTY2                    = 9
+	INTERNAL_RAM              = 10
 	INTERRUPT_ENABLE_REGISTER = 11
 )
 
-func memInit(bootrom []uint8) *Memory {
+func MemInit(bootrom []uint8) *Memory {
 	fb := [16 * 1024]uint8{}
 	for index, item := range bootrom {
 		fb[index] = item
@@ -54,9 +54,9 @@ func memInit(bootrom []uint8) *Memory {
 
 }
 
-func map_addr(addr  uint16) int {
+func map_addr(addr uint16) int {
 	if addr < 0x4000 {
-		return BANK_0;
+		return BANK_0
 	} else if addr >= 0x4000 && addr < 0x8000 {
 		return SWITCHABLE_ROM_BANK
 	} else if addr >= 8000 && addr < 0xA000 {
@@ -90,36 +90,60 @@ func (mem Memory) LoadROM(cartridge []uint8) {
 
 // TODO: Fix
 func (memory Memory) Read8(addres uint16) uint8 {
-	switch (map_addr(addres)) {
-	case 0: return memory.bank_0[addres]
-	case 1: return memory.switchable_rom_bank[addres - 0x4000]
-	case 2: return memory.bank_0[int(addres)]
-	case 3: return memory.bank_0[int(addres)]
-	case 4: return memory.bank_0[int(addres)]
-	case 5: return memory.bank_0[int(addres)]
-	case 6: return memory.bank_0[int(addres)]
-	case 7: return memory.bank_0[int(addres)]
-	case 8: return memory.bank_0[int(addres)]
-	case 9: return memory.bank_0[int(addres)]
-	case 10: return memory.bank_0[int(addres)]
-	default: panic(fmt.Sprintf("Read requested outside memory: %x", addres))
+	switch map_addr(addres) {
+	case 0:
+		return memory.bank_0[addres]
+	case 1:
+		return memory.switchable_rom_bank[addres-0x4000]
+	case 2:
+		return memory.bank_0[int(addres)]
+	case 3:
+		return memory.bank_0[int(addres)]
+	case 4:
+		return memory.bank_0[int(addres)]
+	case 5:
+		return memory.bank_0[int(addres)]
+	case 6:
+		return memory.bank_0[int(addres)]
+	case 7:
+		return memory.bank_0[int(addres)]
+	case 8:
+		return memory.bank_0[int(addres)]
+	case 9:
+		return memory.bank_0[int(addres)]
+	case 10:
+		return memory.bank_0[int(addres)]
+	default:
+		panic(fmt.Sprintf("Read requested outside memory: %x", addres))
 	}
 }
 
 func (memory Memory) Read16(addres uint16) uint16 {
-	switch (map_addr(addres)) {
-	case 0: return uint16(memory.bank_0[addres]) | (uint16(memory.bank_0[addres + 1]) << 8)
-	case 1: return uint16(memory.switchable_rom_bank[addres - 0x4000])
-	case 2: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
-	case 3: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
-	case 4: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
-	case 5: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
-	case 6: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
-	case 7: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
-	case 8: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
-	case 9: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
-	case 10: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
-	default: panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	switch map_addr(addres) {
+	case 0:
+		return uint16(memory.bank_0[addres]) | (uint16(memory.bank_0[addres+1]) << 8)
+	case 1:
+		return uint16(memory.switchable_rom_bank[addres-0x4000])
+	case 2:
+		panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 3:
+		panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 4:
+		panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 5:
+		panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 6:
+		panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 7:
+		panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 8:
+		panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 9:
+		panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	case 10:
+		panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
+	default:
+		panic(fmt.Sprintf("Read requested unimplemented memory: %x", addres))
 	}
 }
 
