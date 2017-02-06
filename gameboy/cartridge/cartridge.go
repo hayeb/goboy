@@ -1,4 +1,4 @@
-package gameboy
+package cartridge
 
 import (
 	"bytes"
@@ -288,7 +288,7 @@ func localization(code uint8) string {
 	}
 }
 
-func CreateCartridgeIlnfo(cartridge []byte) *CartridgeInfo {
+func CreateCartridgeInfo(cartridge []byte) *CartridgeInfo {
 	return &CartridgeInfo{
 		Name:         cartridgeTitle(cartridge),
 		CartType:     typeCode(cartridge[0x147]),

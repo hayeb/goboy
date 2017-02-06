@@ -1,4 +1,4 @@
-package gameboy
+package memory
 
 import "fmt"
 

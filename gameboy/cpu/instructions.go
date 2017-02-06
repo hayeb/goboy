@@ -1,4 +1,4 @@
-package gameboy
+package cpu
 
 type Instruction struct {
 	name  string
@@ -7,6 +7,7 @@ type Instruction struct {
 
 func CreateInstructionMap() *map[uint8]Instruction {
 	return &map[uint8]Instruction{
+		0x20: {JR, 2},
 		0x21: {LD_HL, 3},
 		0x31: {LD_SP, 3},
 		0x32: {LDD_HL_A, 1},
@@ -16,6 +17,7 @@ func CreateInstructionMap() *map[uint8]Instruction {
 }
 
 const (
+	JR	 = "JR"
 	CB       = "CB"
 	LD_SP    = "LD SP"
 	LD_HL    = "LD_HL"
