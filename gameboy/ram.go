@@ -1,8 +1,8 @@
-package memory
+package gameboy
 
 import "fmt"
 
-type Memory struct {
+type memory struct {
 	bank_0                    [16 * 1024]uint8 // 0x0000 (16 kB)
 	switchable_rom_bank       [16 * 1024]uint8 // 0x4000 (16 kB)
 	video_ram                 [8 * 1024]uint8  // 0x8000 (8 kB)
@@ -18,26 +18,26 @@ type Memory struct {
 }
 
 const (
-	BANK_0                    = 0
-	SWITCHABLE_ROM_BANK       = 1
-	VIDEO_RAM                 = 2
-	SWITCHABLE_RAM_BANK       = 3
-	INTERNAL_RAM_8KB          = 4
-	ECHO_INTERNAL_RAM         = 5
-	SPRITE_ATTRIB_MEMORY      = 6
-	EMPTY1                    = 7
-	IO_PORTS                  = 8
-	EMPTY2                    = 9
-	INTERNAL_RAM              = 10
-	INTERRUPT_ENABLE_REGISTER = 11
+	bank_0                    = 0
+	switchable_rom_bank       = 1
+	video_ram                 = 2
+	switchable_ram_bank       = 3
+	internal_ram_8kb          = 4
+	echo_internal_ram         = 5
+	sprite_attrib_memory      = 6
+	empty1                    = 7
+	io_ports                  = 8
+	empty2                    = 9
+	internal_ram              = 10
+	interrupt_enable_register = 11
 )
 
-func MemInit(bootrom []uint8) *Memory {
+func memInit(bootrom []uint8) *memory {
 	fb := [16 * 1024]uint8{}
 	for index, item := range bootrom {
 		fb[index] = item
 	}
-	return &Memory{
+	return &memory{
 		fb,
 		[16 * 1024]uint8{},
 		[8 * 1024]uint8{},
@@ -56,40 +56,40 @@ func MemInit(bootrom []uint8) *Memory {
 
 func map_addr(addr uint16) int {
 	if addr < 0x4000 {
-		return BANK_0
+		return bank_0
 	} else if addr >= 0x4000 && addr < 0x8000 {
-		return SWITCHABLE_ROM_BANK
+		return switchable_rom_bank
 	} else if addr >= 8000 && addr < 0xA000 {
-		return VIDEO_RAM
+		return video_ram
 	} else if addr >= 0xA000 && addr < 0xC000 {
-		return SWITCHABLE_RAM_BANK
+		return switchable_ram_bank
 	} else if addr >= 0xC000 && addr < 0xE000 {
-		return INTERNAL_RAM_8KB
+		return internal_ram_8kb
 	} else if addr >= 0xE000 && addr < 0xFE00 {
-		return ECHO_INTERNAL_RAM
+		return echo_internal_ram
 	} else if addr >= 0xFE00 && addr < 0xFEA0 {
-		return SPRITE_ATTRIB_MEMORY
+		return sprite_attrib_memory
 	} else if addr >= 0xFEA0 && addr < 0xFF00 {
-		return EMPTY1
+		return empty1
 	} else if addr >= 0xFF00 && addr < 0xFF4C {
-		return IO_PORTS
+		return io_ports
 	} else if addr >= 0xFF4C && addr < 0xFF80 {
-		return EMPTY2
+		return empty2
 	} else if addr >= 0xFF80 && addr < 0xFFFF {
-		return INTERNAL_RAM
+		return internal_ram
 	} else if addr == 0xFFFF {
-		return INTERRUPT_ENABLE_REGISTER
+		return interrupt_enable_register
 	} else {
 		panic(fmt.Sprintf("Unknown memory address %x\n", addr))
 	}
 }
 
-func (mem Memory) LoadROM(cartridge []uint8) {
+func (mem memory) LoadROM(cartridge []uint8) {
 
 }
 
 // TODO: Fix
-func (memory Memory) Read8(addres uint16) uint8 {
+func (memory memory) read8(addres uint16) uint8 {
 	switch map_addr(addres) {
 	case 0:
 		return memory.bank_0[addres]
@@ -118,7 +118,7 @@ func (memory Memory) Read8(addres uint16) uint8 {
 	}
 }
 
-func (memory Memory) Read16(addres uint16) uint16 {
+func (memory memory) read16(addres uint16) uint16 {
 	switch map_addr(addres) {
 	case 0:
 		return uint16(memory.bank_0[addres]) | (uint16(memory.bank_0[addres+1]) << 8)
@@ -147,10 +147,10 @@ func (memory Memory) Read16(addres uint16) uint16 {
 	}
 }
 
-func (memory Memory) Write8(Saddress uint16, val uint8) {
+func (memory memory) write8(Saddress uint16, val uint8) {
 
 }
 
-func (memory Memory) Write16(address uint16, val uint16) {
+func (memory memory) write16(address uint16, val uint16) {
 
 }

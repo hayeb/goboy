@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/hayeb/goboy/gameboy/cpu"
+	"github.com/hayeb/goboy/gameboy"
 	"io/ioutil"
 )
 
@@ -11,8 +11,6 @@ func check(e error) {
 	}
 }
 
-
-
 func main() {
 	bootrom, error1 := ioutil.ReadFile("resources/DMG_ROM.bin")
 	check(error1)
@@ -20,5 +18,5 @@ func main() {
 	cartridge, error2 := ioutil.ReadFile("resources/tetris.gb")
 	check(error2)
 
-	cpu.Run(cartridge, bootrom)
+	gameboy.Run(cartridge, bootrom)
 }
