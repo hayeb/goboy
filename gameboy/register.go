@@ -96,3 +96,14 @@ func (reg *register) writeDuo(duo duoRegister, val uint16) {
 		reg.L = byteRegister(right)
 	}
 }
+
+func (reg *register) bit(bit uint8, val uint8) {
+	cond := val & bit
+	if cond != 0 {
+		reg.Flag.Z = false
+	} else {
+		reg.Flag.Z = true
+	}
+	reg.Flag.N = false
+	reg.Flag.H = true
+}
