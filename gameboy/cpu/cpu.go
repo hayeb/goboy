@@ -25,7 +25,7 @@ func Run(cart []uint8, bootrom []uint8  ) {
 			panic(fmt.Sprintf("Unrecognized instruction %x", instructionCode))
 		}
 
-		fmt.Printf("Instr: %s\n", instr.name)
+		fmt.Printf("%#08x \t %s\n", regs.PC.val(), instr.name)
 		switch instr.name {
 		case JR:
 			n := mem.Read8(regs.PC.val() + 1)
@@ -62,10 +62,9 @@ func cbInstruction(mem *memory.Memory, regs *Register, cbCode uint8) {
 	case 0x7c:
 		// BIT 7, H (Check bit 7 in register H, if 0, set Z if 0
 		// 0b01000000 >> 7
-		if regs.H.val() >> 7 == 0 {
+		t := regs.H.val()>>7 & 0x1
+		if t == 0x0 {
 			regs.Flag.Z = true
-		} else {
-			regs.Flag.Z = false
 		}
 		regs.Flag.N = false
 		regs.Flag.H = true

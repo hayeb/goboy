@@ -17,7 +17,7 @@ func CreateInstructionMap() *map[uint8]Instruction {
 }
 
 const (
-	JR	 = "JR"
+	JR	 	 = "JR"
 	CB       = "CB"
 	LD_SP    = "LD SP"
 	LD_HL    = "LD_HL"
