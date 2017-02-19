@@ -31,8 +31,10 @@ func Run(cart []uint8, bootrom []uint8) {
 		case call_nn:
 			// Push adress of next instruction onto the stack
 			// TODO: See if correct?
-			regs.decSP(1)
-			mem.write16(regs.SP.val(), regs.PC.val()+uint16(3))
+			left := mostSig16(regs.PC.val()+uint16(3))
+			right := leastSig16((regs.PC.val()+uint16(3)))
+			pushStack(mem, regs, left)
+			pushStack(mem, regs, right)
 
 			regs.PC = halfWordRegister(readArgHalfword(mem, regs, 1))
 		case cb:
@@ -79,8 +81,13 @@ func Run(cart []uint8, bootrom []uint8) {
 		}
 
 		regs.PC = halfWordRegister(regs.PC.val() + uint16(instr.bytes))
-		spew.Dump(regs)
+		spew.Dump(mem.internal_ram)
 	}
+}
+
+func pushStack(mem *memory, regs *register, val uint8) {
+	mem.write8(regs.SP.val(), val)
+	regs.decSP(1)
 }
 
 func incRegister8(reg *byteRegister) {
@@ -120,3 +127,13 @@ func initializeSystem(cart []uint8, bootrom []uint8) (*cartridgeInfo, *memory, *
 	registers := new(register)
 	return cartridgeInfo, mem, registers, instructionMap
 }
+// Returns a uint8 with the 8 least signigicant bits of i
+func leastSig16(i uint16) uint8 {
+	return uint8(i & ((1 << 8) - 1))
+}
+
+// Returns a uint8 with the 8 most signigicant bits of i
+func mostSig16(i uint16) uint8 {
+	return uint8(i>>8)
+}
+

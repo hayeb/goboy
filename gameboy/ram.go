@@ -129,6 +129,8 @@ func (mem *memory) write8(address uint16, val uint8) {
 		mem.io_ports[address-0xff00] = val
 	case echo_internal_ram_8kb:
 		mem.internal_ram_8kb[address-0x2000-0xc000] = val
+	case internal_ram:
+		mem.internal_ram[address - 0xFF80] = val
 	default:
 		panic(fmt.Sprintf("Write byte not yet implemented for address: %x", address))
 	}
@@ -136,10 +138,6 @@ func (mem *memory) write8(address uint16, val uint8) {
 
 func (mem *memory) write16(address uint16, val uint16) {
 	switch map_addr(address) {
-	case internal_ram:
-		addr := address - 0xFF80
-		mem.internal_ram[addr] = uint8(val & ((1 << 8) - 1))
-		mem.internal_ram[addr+1] = uint8(val >> 8)
 	default:
 		panic(fmt.Sprintf("Write halfword not yet implemented for address %#04x", address))
 	}
