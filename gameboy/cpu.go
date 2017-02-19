@@ -66,12 +66,6 @@ func Run(cart []uint8, bootrom []uint8) {
 			panic(fmt.Sprintf("Instuction not implemented: %s", instr.name))
 		}
 
-		spew.Dump(regs)
-		//fmt.Printf("REG AF: %#08x\n", regs.readDuo(reg_af))
-		//fmt.Printf("REG BC: %#08x\n", regs.readDuo(reg_bc))
-		//fmt.Printf("REG DE: %#08x\n", regs.readDuo(reg_de))
-		//fmt.Printf("REG HL: %#08x\n", regs.readDuo(reg_hl))
-
 		regs.PC = halfWordRegister(regs.PC.val() + uint16(instr.bytes))
 	}
 }

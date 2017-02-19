@@ -1,26 +1,48 @@
 package gameboy
 
+/* CPU Instruction structure. Has two durations for some instructions: action and noop.
+When action noop is 0, the instruction always takes the action duration
+*/
 type instruction struct {
 	name string
 	// The length of the instruction in bytes, including the opcode
 	bytes int
+
+	// Duration of the instruction when an action is taken.
+	duration_action int
+
+	// Duration of the instruction when no action is taken.
+	duration_noop int
 }
 
 func createInstructionMap() *map[uint8]instruction {
 	return &map[uint8]instruction{
-		0xc:  {inc_c, 1},
-		0xe:  {ld_c, 2},
-		0x20: {jr, 2},
-		0x21: {ld_hl, 3},
-		0x31: {ld_sp, 3},
-		0x32: {ldd_hl_a, 1},
-		0x3e: {ld_a, 2},
-		0x77: {ld_HL_a, 1},
-		0xAF: {xor_a, 1},
-		0xCB: {cb, 1},
-		0xE0: {ldh_a8_A, 2},
-		0xE2: {ld_C_a, 1},
+		0xc:  newInstrucion(inc_c, 1, 4),
+		0xe:  newInstrucion(ld_c, 2, 8),
+		0x20: newConditionalInstruction(jr, 2, 12, 8),
+		0x21: newInstrucion(ld_hl, 3, 12),
+		0x31: newInstrucion(ld_sp, 3, 12),
+		0x32: newInstrucion(ldd_hl_a, 1, 8),
+		0x3e: newInstrucion(ld_a, 2, 8),
+		0x77: newInstrucion(ld_HL_a, 1, 8),
+		0xAF: newInstrucion(xor_a, 1, 4),
+		0xCB: newInstrucion(cb, 1, 4),
+		0xE0: newInstrucion(ldh_a8_A, 2, 12),
+		0xE2: newInstrucion(ld_C_a, 1, 8),
 	}
+}
+
+func newConditionalInstruction(name string, length int, actionDuration int, noopDuration int) instruction {
+	return instruction{
+		name:            name,
+		bytes:           length,
+		duration_action: actionDuration,
+		duration_noop:   noopDuration,
+	}
+}
+
+func newInstrucion(name string, length int, duration int) instruction {
+	return newConditionalInstruction(name, length, duration, 0)
 }
 
 const (
