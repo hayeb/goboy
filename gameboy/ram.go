@@ -130,7 +130,7 @@ func (mem *memory) write8(address uint16, val uint8) {
 	case echo_internal_ram_8kb:
 		mem.internal_ram_8kb[address-0x2000-0xc000] = val
 	case internal_ram:
-		mem.internal_ram[address - 0xFF80] = val
+		mem.internal_ram[address-0xFF80] = val
 	default:
 		panic(fmt.Sprintf("Write byte not yet implemented for address: %x", address))
 	}
