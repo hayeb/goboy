@@ -42,13 +42,20 @@ func Run(cart []uint8, bootrom []uint8) {
 			reg.PC = halfWordRegister(reg.PC.val() + uint16(cb.bytes))
 		}
 
-		spew.Dump(mem.internal_ram)
+		spew.Dump(reg)
 	}
 }
 
-func pushStack(mem *memory, regs *register, val uint8) {
+func pushStack8(mem *memory, regs *register, val uint8) {
 	mem.write8(regs.SP.val(), val)
 	regs.decSP(1)
+}
+
+func pushStack16(mem *memory, reg *register, val uint16) {
+	left := mostSig16(val)
+	right := leastSig16(val)
+	pushStack8(mem, reg, left)
+	pushStack8(mem, reg, right)
 }
 
 func incRegister8(reg *byteRegister) {
@@ -59,12 +66,12 @@ func decrRegister8(reg *byteRegister) {
 	*reg = byteRegister(reg.val() - 1)
 }
 
-// reads a byte from memory from address SP + offset and returns the value
+// Read a byte from memory from address SP + offset and returns the value
 func readArgByte(mem *memory, reg *register, offset int) uint8 {
 	return mem.read8(reg.PC.val() + uint16(offset))
 }
 
-// Reads a halfword from memory from address SP + offset and returns the value
+// Read a halfword from memory from address SP + offset and returns the value
 func readArgHalfword(mem *memory, reg *register, offset int) uint16 {
 	return mem.read16(reg.PC.val() + uint16(offset))
 }

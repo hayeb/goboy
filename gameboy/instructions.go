@@ -28,6 +28,7 @@ func createInstructionMap() *map[uint8]instruction {
 		0xc:  newInstruction("INC_C", 1, 4, inc_c),
 		0xe:  newInstruction("LD_C", 2, 8, ld_c),
 		0x11: newInstruction("LD_DE_d16", 3, 12, ld_de_d16),
+		0x17: newInstruction("RLA", 1, 4, rla),
 		0x1a: newInstruction("LD_A_(DE)", 1, 8, ld_a_DE),
 		0x20: newConditionalInstruction("JR", 2, 12, 8, jr),
 		0x21: newInstruction("LD_HL", 3, 12, ld_hl),
@@ -36,6 +37,7 @@ func createInstructionMap() *map[uint8]instruction {
 		0x3e: newInstruction("LD_A", 2, 8, ld_a),
 		0x77: newInstruction("LD_(HL)_a", 1, 8, ld_HL_a),
 		0xAF: newInstruction("XOR_A", 1, 4, xor_a),
+		0xC5: newInstruction("PUSH_BC", 1, 16, push_bc),
 		0xCB: newInstruction("CB", 1, 4, nil),
 		0xCD: newInstruction("CALL_nn", 3, 12, call_nn),
 		0xE0: newInstruction("LDH_a8_A", 2, 12, ldh_a8_A),
@@ -70,8 +72,8 @@ func mostSig16(i uint16) uint8 {
 func call_nn(mem *memory, reg *register) {
 	left := mostSig16(reg.PC.val() + uint16(3))
 	right := leastSig16((reg.PC.val() + uint16(3)))
-	pushStack(mem, reg, left)
-	pushStack(mem, reg, right)
+	pushStack8(mem, reg, left)
+	pushStack8(mem, reg, right)
 
 	reg.PC = halfWordRegister(readArgHalfword(mem, reg, 1))
 }
@@ -136,4 +138,12 @@ func xor_a(mem *memory, reg *register) {
 	if reg.A == 0 {
 		reg.Flag.Z = true
 	}
+}
+
+func push_bc(mem *memory, reg *register) {
+	pushStack16(mem, reg, reg.readDuo(reg_bc))
+}
+
+func rla(mem *memory, reg *register) {
+
 }
