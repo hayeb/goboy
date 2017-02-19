@@ -44,7 +44,7 @@ const (
 	reg_hl
 )
 
-func (reg register) duoRegs(duo duoRegister) (byteRegister, byteRegister) {
+func (reg *register) duoRegs(duo duoRegister) (byteRegister, byteRegister) {
 	switch duo {
 	case reg_af:
 		return reg.A, reg.F
@@ -63,9 +63,9 @@ func duoRegisterValue(left byteRegister, right byteRegister) uint16 {
 	return uint16(left.val())<<8 | uint16(right.val())
 }
 
-func (reg register) readDuo(duo duoRegister) uint16 {
+func (reg *register) readDuo(duo duoRegister) uint16 {
 	l, r := reg.duoRegs(duo)
-	return uint16(l)<<8 | uint16(r)
+	return uint16(l.val())<<8 | uint16(r.val())
 }
 
 func (reg *register) decrDuo(duo duoRegister) {
@@ -106,4 +106,12 @@ func (reg *register) bit(bit uint8, val uint8) {
 	}
 	reg.Flag.N = false
 	reg.Flag.H = true
+}
+
+func (reg *register) incSP(n int) {
+	reg.SP = halfWordRegister(reg.SP.val() + uint16(n))
+}
+
+func (reg *register) decSP(n int) {
+	reg.SP = halfWordRegister(reg.SP.val() - uint16(n))
 }

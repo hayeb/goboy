@@ -32,14 +32,22 @@ const (
 	interrupt_enable_register = 11
 )
 
-func memInit(bootrom []uint8) *memory {
-	fb := [16 * 1024]uint8{}
+func memInit(bootrom []uint8, cartridge []uint8) *memory {
+	b0 := [16 * 1024]uint8{}
+	sw := [16 * 1024]uint8{}
 	for index, item := range bootrom {
-		fb[index] = item
+		b0[index] = item
+	}
+	// TODO: Implement switching of the bootrom page when memory address 0xFE is executed
+	for i := 0xFF; i < len(b0); i++ {
+		b0[i] = cartridge[i-0xFF]
+	}
+	for j := 0; j < len(sw); j++ {
+		sw[j] = cartridge[j+len(sw)]
 	}
 	return &memory{
-		fb,
-		[16 * 1024]uint8{},
+		b0,
+		sw,
 		[8 * 1024]uint8{},
 		[8 * 1024]uint8{},
 		[8 * 1024]uint8{},
@@ -122,13 +130,17 @@ func (mem *memory) write8(address uint16, val uint8) {
 	case echo_internal_ram_8kb:
 		mem.internal_ram_8kb[address-0x2000-0xc000] = val
 	default:
-		panic(fmt.Sprintf("Write byte requested unimplemented memory: %x", address))
+		panic(fmt.Sprintf("Write byte not yet implemented for address: %x", address))
 	}
 }
 
-func (memory *memory) write16(address uint16, val uint16) {
+func (mem *memory) write16(address uint16, val uint16) {
 	switch map_addr(address) {
+	case internal_ram:
+		addr := address - 0xFF80
+		mem.internal_ram[addr] = uint8(val & ((1 << 8) - 1))
+		mem.internal_ram[addr+1] = uint8(val >> 8)
 	default:
-		panic(fmt.Sprintf("Writing a halfword not yet implemented for address %#04x", address))
+		panic(fmt.Sprintf("Write halfword not yet implemented for address %#04x", address))
 	}
 }

@@ -28,6 +28,13 @@ func Run(cart []uint8, bootrom []uint8) {
 
 		fmt.Printf("%#04x \t %s\n", regs.PC.val(), instr.name)
 		switch instr.name {
+		case call_nn:
+			// Push adress of next instruction onto the stack
+			// TODO: See if correct?
+			regs.decSP(1)
+			mem.write16(regs.SP.val(), regs.PC.val()+uint16(3))
+
+			regs.PC = halfWordRegister(readArgHalfword(mem, regs, 1))
 		case cb:
 			nb := readArgByte(mem, regs, 1)
 			cbInstruction(mem, regs, nb)
@@ -40,12 +47,17 @@ func Run(cart []uint8, bootrom []uint8) {
 			incRegister8(&regs.C)
 		case ld_a:
 			regs.A = byteRegister(readArgByte(mem, regs, 1))
+		case ld_a_DE:
+			regs.A = byteRegister(mem.read8(regs.readDuo(reg_de)))
 		case ld_c:
 			regs.C = byteRegister(readArgByte(mem, regs, 1))
 		case ld_C_a:
 			mem.write8(0xFF00+uint16(regs.C.val()), regs.A.val())
+		case ld_de_d16:
+			regs.writeDuo(reg_de, readArgHalfword(mem, regs, 1))
 		case ld_sp:
-			arg := readArgByte(mem, regs, 1)
+			arg := readArgHalfword(mem, regs, 1)
+			fmt.Printf("SP: %#04x\n", arg)
 			regs.SP = halfWordRegister(arg)
 		case ld_hl:
 			regs.writeDuo(reg_hl, readArgHalfword(mem, regs, 1))
@@ -67,6 +79,7 @@ func Run(cart []uint8, bootrom []uint8) {
 		}
 
 		regs.PC = halfWordRegister(regs.PC.val() + uint16(instr.bytes))
+		spew.Dump(regs)
 	}
 }
 
@@ -78,12 +91,14 @@ func decrRegister8(reg *byteRegister) {
 	*reg = byteRegister(reg.val() - 1)
 }
 
-func readArgByte(mem *memory, reg *register, arg int) uint8 {
-	return mem.read8(reg.PC.val() + uint16(arg))
+// reads a byte from memory from address SP + offset and returns the value
+func readArgByte(mem *memory, reg *register, offset int) uint8 {
+	return mem.read8(reg.PC.val() + uint16(offset))
 }
 
-func readArgHalfword(mem *memory, reg *register, arg int) uint16 {
-	return mem.read16(reg.PC.val() + uint16(arg))
+// Reads a halfword from memory from address SP + offset and returns the value
+func readArgHalfword(mem *memory, reg *register, offset int) uint16 {
+	return mem.read16(reg.PC.val() + uint16(offset))
 }
 
 func cbInstruction(mem *memory, regs *register, cbCode uint8) {
@@ -101,7 +116,7 @@ func cbInstruction(mem *memory, regs *register, cbCode uint8) {
 func initializeSystem(cart []uint8, bootrom []uint8) (*cartridgeInfo, *memory, *register, *map[uint8]instruction) {
 	cartridgeInfo := createCartridgeInfo(cart)
 	instructionMap := createInstructionMap()
-	mem := memInit(bootrom)
+	mem := memInit(bootrom, cart)
 	registers := new(register)
 	return cartridgeInfo, mem, registers, instructionMap
 }
