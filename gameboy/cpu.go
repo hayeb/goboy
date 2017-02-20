@@ -26,9 +26,8 @@ func Run(cart []uint8, bootrom []uint8) {
 			panic(fmt.Sprintf("Unrecognized instruction %x at address %#04x", instructionCode, reg.PC.val()))
 		}
 
-		fmt.Printf("%#04x \t %s\n", reg.PC.val(), instr.name)
-
 		if instr.name != "CB" {
+			fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
 			instr.executor(mem, reg)
 			reg.PC = halfWordRegister(reg.PC.val() + uint16(instr.bytes))
 		} else {
@@ -38,11 +37,11 @@ func Run(cart []uint8, bootrom []uint8) {
 			if !ok {
 				panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, reg.PC.val()+1))
 			}
+			fmt.Printf("%#04x\t%s %s\n", reg.PC.val(), instr.name, cb.name)
 			cb.executor(mem, reg)
 			reg.PC = halfWordRegister(reg.PC.val() + uint16(cb.bytes))
 		}
-
-		spew.Dump(reg)
+		//spew.Dump(reg)
 	}
 }
 
@@ -52,10 +51,19 @@ func pushStack8(mem *memory, regs *register, val uint8) {
 }
 
 func pushStack16(mem *memory, reg *register, val uint16) {
-	left := mostSig16(val)
-	right := leastSig16(val)
-	pushStack8(mem, reg, left)
-	pushStack8(mem, reg, right)
+	pushStack8(mem, reg, mostSig16(val))
+	pushStack8(mem, reg, leastSig16(val))
+}
+
+func popStack8(mem *memory, reg *register) uint8 {
+	reg.incSP(1)
+	return mem.read8(reg.PC.val())
+}
+
+func popStack16(mem *memory, reg *register) uint16{
+	least := popStack8(mem, reg)
+	most := popStack8(mem, reg)
+	return uint16(most) << 8 | uint16(least)
 }
 
 func incRegister8(reg *byteRegister) {

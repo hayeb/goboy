@@ -37,6 +37,7 @@ func createInstructionMap() *map[uint8]instruction {
 		0x3e: newInstruction("LD_A", 2, 8, ld_a),
 		0x77: newInstruction("LD_(HL)_a", 1, 8, ld_HL_a),
 		0xAF: newInstruction("XOR_A", 1, 4, xor_a),
+		0xC1: newInstruction("POP_BC", 1, 12, pop_bc),
 		0xC5: newInstruction("PUSH_BC", 1, 16, push_bc),
 		0xCB: newInstruction("CB", 1, 4, nil),
 		0xCD: newInstruction("CALL_nn", 3, 12, call_nn),
@@ -86,7 +87,12 @@ func jr(mem *memory, reg *register) {
 }
 
 func inc_c(mem *memory, reg *register) {
+	val := reg.C
 	incRegister8(&reg.C)
+	reg.Flag.Z = reg.C == 0
+	reg.Flag.N = false
+	// TODO: hacky half-carry. Do differently?
+	reg.Flag.H = val < 8 && reg.C >= 16
 }
 
 func ld_a(mem *memory, reg *register) {
@@ -145,5 +151,14 @@ func push_bc(mem *memory, reg *register) {
 }
 
 func rla(mem *memory, reg *register) {
+	r, c := rLeft(reg.A.val())
+	reg.A = byteRegister(r)
+	reg.Flag.Z = reg.A == 0
+	reg.Flag.N = false
+	reg.Flag.H = false
+	reg.Flag.C = c
+}
 
+func pop_bc(mem *memory, reg *register) {
+	reg.writeDuo(reg_bc, popStack16(mem, reg))
 }

@@ -35,18 +35,16 @@ type cbInstructionExecutor func(mem *memory, reg *register)
 
 func bit_7_h(_ *memory, reg *register) {
 	reg.bit(1<<7, reg.H.val())
+	reg.Flag.Z = reg.H.val() == 0
+	reg.Flag.N = false
+	reg.Flag.H = true
 }
 
 func rl_c(mem *memory, reg *register) {
-	// TODO: Implement shifting THROUGH carry flag.
-	val := reg.C.val()
-	reg.C = byteRegister(rotateLeftThroughCarry(val, 1))
+	newVal, carry := rLeftCarry(reg.C.val(), reg.Flag.C)
+	reg.C = byteRegister(newVal)
 	reg.Flag.Z = reg.C == 0
 	reg.Flag.N = false
 	reg.Flag.H = false
-	reg.Flag.C = val>>7 == 1
-}
-
-func rotateLeftThroughCarry(val uint8, n uint) uint8 {
-	return val<<n | val>>(8-n)
+	reg.Flag.C = carry
 }
