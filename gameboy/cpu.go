@@ -23,7 +23,7 @@ func Run(cart []uint8, bootrom []uint8) {
 		instr, ok := (*instrMap)[instructionCode]
 
 		if !ok {
-			panic(fmt.Sprintf("Unrecognized instruction %x at address %#04x", instructionCode, reg.PC.val()))
+			panic(fmt.Sprintf("Unrecognized instruction %#02x at address %#04x", instructionCode, reg.PC.val()))
 		}
 
 		if instr.name != "CB" {
@@ -31,7 +31,6 @@ func Run(cart []uint8, bootrom []uint8) {
 			instr.executor(mem, reg)
 			reg.PC = halfWordRegister(reg.PC.val() + uint16(instr.bytes))
 		} else {
-			// Look up the CB instruction
 			cbCode := mem.read8(reg.PC.val() + 1)
 			cb, ok := (*cbInstrMap)[cbCode]
 			if !ok {
@@ -41,7 +40,6 @@ func Run(cart []uint8, bootrom []uint8) {
 			cb.executor(mem, reg)
 			reg.PC = halfWordRegister(reg.PC.val() + uint16(cb.bytes))
 		}
-		//spew.Dump(reg)
 	}
 }
 

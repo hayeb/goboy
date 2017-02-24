@@ -34,7 +34,7 @@ func newCBConditionalInstruction(name string, length int, actionDuration int, no
 type cbInstructionExecutor func(mem *memory, reg *register)
 
 func bit_7_h(_ *memory, reg *register) {
-	reg.bit(1<<7, reg.H.val())
+	reg.bit(7, reg.H.val())
 	reg.Flag.Z = reg.H.val() == 0
 	reg.Flag.N = false
 	reg.Flag.H = true

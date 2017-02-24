@@ -97,8 +97,8 @@ func (reg *register) writeDuo(duo duoRegister, val uint16) {
 	}
 }
 
-func (reg *register) bit(bit uint8, val uint8) {
-	cond := val & bit
+func (reg *register) bit(bit int, val uint8) {
+	cond := val & (1 << uint(bit))
 	if cond != 0 {
 		reg.Flag.Z = false
 	} else {
