@@ -41,7 +41,7 @@ func createInstructionMap() *map[uint8]instruction {
 		0xC1: newInstruction("POP_BC", 1, 12, pop_bc),
 		0xC5: newInstruction("PUSH_BC", 1, 16, push_bc),
 		0xCB: newInstruction("CB", 1, 4, nil),
-		0xCD: newInstruction("CALL_nn", 3, 12, call_nn),
+		0xCD: newInstruction("CALL_nn", 0, 12, call_nn), // CALL instruction has no length, as it interferes with PC
 		0xE0: newInstruction("LDH_a8_A", 2, 12, ldh_a8_A),
 		0xE2: newInstruction("LD_(C)_A", 1, 8, ld_C_a),
 	}
