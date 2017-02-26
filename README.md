@@ -12,4 +12,4 @@ http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 
 
 # TODO
-*    Check flags handling for every instruction implemented so far.
+*    Implement a somewhat usable debugger

@@ -6,7 +6,7 @@ var _ = fmt.Sprintf("")
 
 /*
 CPU Instruction structure. Has two durations for some instructions: action and noop.
-When action noop is 0, the instruction always takes the action duration
+When action noop is 0, the instruction always takes the action duration.
 */
 type instruction struct {
 	name string
@@ -53,6 +53,7 @@ func createInstructionMap() *map[uint8]instruction {
 		0xcd: newInstruction("CALL a16", 0, 12, call_nn), // CALL has no length, as it interferes with updating PC
 		0xe0: newInstruction("LDH a8,A", 2, 12, ldh_a8_A),
 		0xe2: newInstruction("LD (C),A", 1, 8, ld_C_a),
+		0xea: newInstruction("LD (a16),A", 3, 16, ld_A16_A),
 		0xfe: newInstruction("CP d8", 2, 8, cp_d8),
 	}
 }
@@ -109,10 +110,7 @@ func ld_a(mem *memory, reg *register) {
 }
 
 func ld_a_DE(mem *memory, reg *register) {
-	val := mem.read8(reg.readDuo(reg_de))
-	fmt.Printf("LD A, (DE): Read byte %#02x from memory\n", val)
-	fmt.Printf("LD A, (DE): Read byte %#02x from memory\n", mem.read8(0x0104))
-	reg.A = byteRegister(val)
+	reg.A = byteRegister(mem.read8(reg.readDuo(reg_de)))
 	// Does not affect flags
 }
 
@@ -224,7 +222,7 @@ func ret(mem *memory, reg *register) {
 }
 
 func ld_a_e(mem *memory, reg *register) {
-	reg.A = reg.C
+	reg.A = reg.E
 }
 
 func cp_d8(mem *memory, reg *register) {
@@ -233,4 +231,8 @@ func cp_d8(mem *memory, reg *register) {
 	reg.Flag.N = true
 	reg.Flag.H = false // TODO: Check borrow
 	reg.Flag.C = reg.A.val() < arg
+}
+
+func ld_A16_A(mem *memory, reg *register) {
+	mem.write8(readArgHalfword(mem, reg, 1), reg.A.val())
 }
