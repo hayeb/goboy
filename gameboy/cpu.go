@@ -22,6 +22,8 @@ func Run(cart []uint8, bootrom []uint8) {
 		instructionCode := mem.read8(reg.PC.val())
 		instr, ok := (*instrMap)[instructionCode]
 
+		fmt.Printf("Mem at 0x0104: %#02x", mem.read8(0x0104))
+
 		if !ok {
 			panic(fmt.Sprintf("Unrecognized instruction %#02x at address %#04x", instructionCode, reg.PC.val()))
 		}
@@ -55,7 +57,7 @@ func pushStack16(mem *memory, reg *register, val uint16) {
 
 func popStack8(mem *memory, reg *register) uint8 {
 	reg.incSP(1)
-	return mem.read8(reg.PC.val())
+	return mem.read8(reg.SP.val())
 }
 
 func popStack16(mem *memory, reg *register) uint16{

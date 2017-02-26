@@ -40,7 +40,7 @@ func memInit(bootrom []uint8, cartridge []uint8) *memory {
 	}
 	// TODO: Implement switching of the bootrom page when memory address 0xFE is executed
 	for i := 0xFF; i < len(b0); i++ {
-		b0[i] = cartridge[i-0xFF]
+		b0[i] = cartridge[i]
 	}
 	for j := 0; j < len(sw); j++ {
 		sw[j] = cartridge[j+len(sw)]
@@ -99,6 +99,8 @@ func (memory memory) read8(address uint16) uint8 {
 		return memory.switchable_rom_bank[address-0x4000]
 	case io_ports:
 		return memory.io_ports[address-0xff00]
+	case internal_ram:
+		return memory.internal_ram[address - 0xff80]
 	default:
 		panic(fmt.Sprintf("Read byte requested outside implemented memory: %x", address))
 	}
@@ -125,14 +127,24 @@ func (mem *memory) write8(address uint16, val uint8) {
 		mem.switchable_rom_bank[address-0x4000] = val
 	case video_ram:
 		mem.video_ram[address-0x8000] = val
-	case io_ports:
-		mem.io_ports[address-0xff00] = val
+	case switchable_ram_bank:
+		mem.switchable_ram_bank[address - 0xa000] = val
+	case internal_ram_8kb:
+		mem.internal_ram_8kb[address - 0xc000] = val
 	case echo_internal_ram_8kb:
 		mem.internal_ram_8kb[address-0x2000-0xc000] = val
+	case sprite_attrib_memory:
+		mem.sprite_attrib_memory[address - 0xfe00] = val
+	case empty1:
+		mem.empty1[address - 0xfea0] = val
+	case io_ports:
+		mem.io_ports[address-0xff00] = val
+	case empty2:
+		mem.empty2[address - 0xff4c] = val
 	case internal_ram:
 		mem.internal_ram[address-0xFF80] = val
 	default:
-		panic(fmt.Sprintf("Write byte not yet implemented for address: %x", address))
+		panic(fmt.Sprintf("Write byte not yet implemented for address: %#04x on %d", address, map_addr(address)))
 	}
 }
 
