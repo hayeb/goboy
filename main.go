@@ -19,4 +19,5 @@ func main() {
 	check(error2)
 
 	gameboy.Run(cartridge, bootrom)
+
 }

@@ -12,8 +12,8 @@ type cbInstruction struct {
 
 func createCBInstructionMap() *map[uint8]cbInstruction {
 	return &map[uint8]cbInstruction{
-		0x7c: newCBInstruction("BIT_7_H", 2, 8, bit_7_h),
-		0x11: newCBInstruction("RL_C", 2, 8, rl_c),
+		0x7c: newCBInstruction("BIT 7,H", 2, 8, bit_7_h),
+		0x11: newCBInstruction("RL C", 2, 8, rl_c),
 	}
 }
 
@@ -35,9 +35,6 @@ type cbInstructionExecutor func(mem *memory, reg *register)
 
 func bit_7_h(_ *memory, reg *register) {
 	reg.bit(7, reg.H.val())
-	reg.Flag.Z = reg.H.val() == 0
-	reg.Flag.N = false
-	reg.Flag.H = true
 }
 
 func rl_c(mem *memory, reg *register) {
