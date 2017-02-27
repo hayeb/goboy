@@ -3,6 +3,7 @@ package gameboy
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/veandco/go-sdl2/sdl"
 )
 
 var _ = spew.Config
@@ -17,6 +18,21 @@ func Run(cart []uint8, bootrom []uint8) {
 	if ci.ramSize != ram_none || ci.romSize != rom_kbit_256 {
 		panic("Cartridge not supported")
 	}
+
+	fmt.Println("Open window")
+	sdl.Init(sdl.INIT_EVERYTHING)
+
+	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
+		800, 600, sdl.WINDOW_SHOWN)
+	if err != nil {
+		panic(err)
+	}
+	defer window.Destroy()
+
+	surface, err := window.GetSurface()
+	rect := sdl.Rect{0, 0, 200, 200}
+	surface.FillRect(&rect,0xffff0000)
+	window.UpdateSurface()
 
 	for {
 		instructionCode := mem.read8(reg.PC.val())
