@@ -38,6 +38,8 @@ func Run(cart []uint8, bootrom []uint8) {
 		instructionCode := mem.read8(reg.PC.val())
 		instr, ok := (*instrMap)[instructionCode]
 
+		fmt.Printf("Mem at 0x0104: %#02x", mem.read8(0x0104))
+
 		if !ok {
 			spew.Dump(mem)
 			spew.Dump(reg)

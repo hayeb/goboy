@@ -9,18 +9,18 @@ CPU Instruction structure. Has two durations for some instructions: action and n
 When action noop is 0, the instruction always takes the action duration.
 */
 type instruction struct {
-	name string
+	name            string
 	// The length of the instruction in bytes, including the opcode
-	bytes int
+	bytes           int
 
 	// Duration of the instruction when an action is taken.
 	duration_action int
 
 	// Duration of the instruction when no action is taken.
-	duration_noop int
+	duration_noop   int
 
 	// Pointer to the function to be executed
-	executor instructionExecutor
+	executor        instructionExecutor
 }
 
 type instructionExecutor func(mem *memory, reg *register)
@@ -110,7 +110,10 @@ func ld_a(mem *memory, reg *register) {
 }
 
 func ld_a_DE(mem *memory, reg *register) {
-	reg.A = byteRegister(mem.read8(reg.readDuo(reg_de)))
+	val := mem.read8(reg.readDuo(reg_de))
+	fmt.Printf("LD A, (DE): Read byte %#02x from memory", val)
+	fmt.Printf("LD A, (DE): Read byte %#02x from memory", mem.read8(0x0104))
+	reg.A = byteRegister(val)
 	// Does not affect flags
 }
 
@@ -120,7 +123,7 @@ func ld_c(mem *memory, reg *register) {
 }
 
 func ld_C_a(mem *memory, reg *register) {
-	mem.write8(0xFF00+uint16(reg.C.val()), reg.A.val())
+	mem.write8(0xFF00 + uint16(reg.C.val()), reg.A.val())
 	// Does not affect flags
 }
 
