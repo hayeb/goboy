@@ -7,8 +7,10 @@ type cbInstruction struct {
 	actionDuration int
 	noopDuration   int
 
-	executor instructionExecutor
+	executor cbInstructionExecutor
 }
+
+type cbInstructionExecutor func(mem *memory, reg *register, cbInstr *cbInstruction) int
 
 func createCBInstructionMap() *map[uint8]cbInstruction {
 	return &map[uint8]cbInstruction{
@@ -17,11 +19,11 @@ func createCBInstructionMap() *map[uint8]cbInstruction {
 	}
 }
 
-func newCBInstruction(name string, length int, duration int, fp func(mem *memory, reg *register)) cbInstruction {
+func newCBInstruction(name string, length int, duration int, fp func(mem *memory, reg *register, cbInstr *cbInstruction) int) cbInstruction {
 	return newCBConditionalInstruction(name, length, duration, 0, fp)
 }
 
-func newCBConditionalInstruction(name string, length int, actionDuration int, noopDuration int, fp func(mem *memory, reg *register)) cbInstruction {
+func newCBConditionalInstruction(name string, length int, actionDuration int, noopDuration int, fp func(mem *memory, reg *register, cbInstr *cbInstruction) int) cbInstruction {
 	return cbInstruction{
 		name:           name,
 		bytes:          length,
@@ -31,17 +33,17 @@ func newCBConditionalInstruction(name string, length int, actionDuration int, no
 	}
 }
 
-type cbInstructionExecutor func(mem *memory, reg *register)
-
-func bit_7_h(_ *memory, reg *register) {
+func bit_7_h(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.bit(7, reg.H.val())
+	return cbInstr.actionDuration
 }
 
-func rl_c(mem *memory, reg *register) {
+func rl_c(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	newVal, carry := rLeftCarry(reg.C.val(), reg.Flag.C)
 	reg.C = byteRegister(newVal)
 	reg.Flag.Z = reg.C == 0
 	reg.Flag.N = false
 	reg.Flag.H = false
 	reg.Flag.C = carry
+	return cbInstr.actionDuration
 }

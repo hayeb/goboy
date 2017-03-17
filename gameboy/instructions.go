@@ -9,21 +9,21 @@ CPU Instruction structure. Has two durations for some instructions: action and n
 When action noop is 0, the instruction always takes the action duration.
 */
 type instruction struct {
-	name            string
+	name string
 	// The length of the instruction in bytes, including the opcode
-	bytes           int
+	bytes int
 
 	// Duration of the instruction when an action is taken.
 	duration_action int
 
 	// Duration of the instruction when no action is taken.
-	duration_noop   int
+	duration_noop int
 
 	// Pointer to the function to be executed
-	executor        instructionExecutor
+	executor instructionExecutor
 }
 
-type instructionExecutor func(mem *memory, reg *register)
+type instructionExecutor func(mem *memory, reg *register, instr *instruction) int
 
 func createInstructionMap() *map[uint8]instruction {
 	return &map[uint8]instruction{
@@ -58,7 +58,7 @@ func createInstructionMap() *map[uint8]instruction {
 	}
 }
 
-func newConditionalInstruction(name string, length int, actionDuration int, noopDuration int, fp func(mem *memory, reg *register)) instruction {
+func newConditionalInstruction(name string, length int, actionDuration int, noopDuration int, fp func(mem *memory, reg *register, instr *instruction) int) instruction {
 	return instruction{
 		name:            name,
 		bytes:           length,
@@ -68,7 +68,7 @@ func newConditionalInstruction(name string, length int, actionDuration int, noop
 	}
 }
 
-func newInstruction(name string, length int, duration int, fp func(mem *memory, reg *register)) instruction {
+func newInstruction(name string, length int, duration int, fp func(mem *memory, reg *register, instr *instruction) int) instruction {
 	return newConditionalInstruction(name, length, duration, 0, fp)
 }
 
@@ -82,84 +82,96 @@ func mostSig16(i uint16) uint8 {
 	return uint8(i >> 8)
 }
 
-func call_nn(mem *memory, reg *register) {
-	pushStack16(mem, reg, reg.PC.val() + uint16(3))
+func call_nn(mem *memory, reg *register, instr *instruction) int {
+	pushStack16(mem, reg, reg.PC.val()+uint16(3))
 	reg.PC = halfWordRegister(readArgHalfword(mem, reg, 1))
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func jr_nz(mem *memory, reg *register) {
+func jr_nz(mem *memory, reg *register, instr *instruction) int {
 	n := int8(readArgByte(mem, reg, 1))
 	if !reg.Flag.Z {
 		reg.PC = halfWordRegister(int(reg.PC.val()) + int(n))
+		return instr.duration_action
 	}
 	// Does not affect flags
+	return instr.duration_noop
 }
 
-func inc_c(mem *memory, reg *register) {
+func inc_c(mem *memory, reg *register, instr *instruction) int {
 	val := reg.C
 	incRegister8(&reg.C)
 	reg.Flag.Z = reg.C == 0
 	reg.Flag.N = false
 
-	reg.Flag.H = (val & 0xf) + (1 & 0xf) & 0x10 == 0x10
+	reg.Flag.H = (val&0xf)+(1&0xf)&0x10 == 0x10
+	return instr.duration_action
 }
 
-func ld_a(mem *memory, reg *register) {
+func ld_a(mem *memory, reg *register, instr *instruction) int {
 	reg.A = byteRegister(readArgByte(mem, reg, 1))
+	return instr.duration_action
 }
 
-func ld_a_DE(mem *memory, reg *register) {
+func ld_a_DE(mem *memory, reg *register, instr *instruction) int {
 	val := mem.read8(reg.readDuo(reg_de))
-	fmt.Printf("LD A, (DE): Read byte %#02x from memory", val)
-	fmt.Printf("LD A, (DE): Read byte %#02x from memory", mem.read8(0x0104))
 	reg.A = byteRegister(val)
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func ld_c(mem *memory, reg *register) {
+func ld_c(mem *memory, reg *register, instr *instruction) int {
 	reg.C = byteRegister(readArgByte(mem, reg, 1))
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func ld_C_a(mem *memory, reg *register) {
-	mem.write8(0xFF00 + uint16(reg.C.val()), reg.A.val())
+func ld_C_a(mem *memory, reg *register, instr *instruction) int {
+	mem.write8(0xFF00+uint16(reg.C.val()), reg.A.val())
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func ld_de_d16(mem *memory, reg *register) {
+func ld_de_d16(mem *memory, reg *register, instr *instruction) int {
 	reg.writeDuo(reg_de, readArgHalfword(mem, reg, 1))
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func ld_sp(mem *memory, reg *register) {
+func ld_sp(mem *memory, reg *register, instr *instruction) int {
 	arg := readArgHalfword(mem, reg, 1)
 	reg.SP = halfWordRegister(arg)
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func ld_hl(mem *memory, reg *register) {
+func ld_hl(mem *memory, reg *register, instr *instruction) int {
 	reg.writeDuo(reg_hl, readArgHalfword(mem, reg, 1))
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func ld_HL_a(mem *memory, reg *register) {
+func ld_HL_a(mem *memory, reg *register, instr *instruction) int {
 	mem.write8(mem.read16(reg.readDuo(reg_hl)), readArgByte(mem, reg, 1))
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func ldd_HL_a(mem *memory, reg *register) {
+func ldd_HL_a(mem *memory, reg *register, instr *instruction) int {
 	mem.write8(reg.readDuo(reg_hl), reg.A.val())
 	reg.decrDuo(reg_hl)
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func ldh_a8_A(mem *memory, reg *register) {
+func ldh_a8_A(mem *memory, reg *register, instr *instruction) int {
 	reg.A = byteRegister(mem.read8(uint16(readArgByte(mem, reg, 1)) + 0xff00))
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func xor_a(mem *memory, reg *register) {
+func xor_a(mem *memory, reg *register, instr *instruction) int {
 	reg.A = reg.A ^ reg.A
 	if reg.A == 0 {
 		reg.Flag.Z = true
@@ -167,75 +179,89 @@ func xor_a(mem *memory, reg *register) {
 	reg.Flag.N = false
 	reg.Flag.N = false
 	reg.Flag.C = false
+	return instr.duration_action
 }
 
-func push_bc(mem *memory, reg *register) {
+func push_bc(mem *memory, reg *register, instr *instruction) int {
 	pushStack16(mem, reg, reg.readDuo(reg_bc))
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func rla(mem *memory, reg *register) {
+func rla(mem *memory, reg *register, instr *instruction) int {
 	r, c := rLeft(reg.A.val())
 	reg.A = byteRegister(r)
 	reg.Flag.Z = reg.A == 0
 	reg.Flag.N = false
 	reg.Flag.H = false
 	reg.Flag.C = c
+	return instr.duration_action
 }
 
-func pop_bc(mem *memory, reg *register) {
+func pop_bc(mem *memory, reg *register, instr *instruction) int {
 	val := popStack16(mem, reg)
 	reg.writeDuo(reg_bc, val)
 	// Does not affect flags
+	return instr.duration_action
 }
 
-func dec_b(mem *memory, reg *register) {
+func dec_b(mem *memory, reg *register, instr *instruction) int {
 	val := reg.B.val()
 	reg.B = byteRegister(val - uint8(1))
 	reg.Flag.Z = reg.B == 0
 	reg.Flag.N = true
-	reg.Flag.H = (val & 0xf0) - (1 & 0xf0) & 0x8 == 0x8
+	reg.Flag.H = (val&0xf0)-(1&0xf0)&0x8 == 0x8
+	return instr.duration_action
 }
 
-func ld_c_a(mem *memory, reg *register) {
+func ld_c_a(mem *memory, reg *register, instr *instruction) int {
 	reg.C = reg.A
+	return instr.duration_action
 }
 
-func ld_b_d8(mem *memory, reg *register) {
+func ld_b_d8(mem *memory, reg *register, instr *instruction) int {
 	arg := readArgByte(mem, reg, 1)
-	reg.B = byteRegister(arg);
+	reg.B = byteRegister(arg)
+	return instr.duration_action
 }
 
-func ld_HLP_a(mem *memory, reg *register) {
+func ld_HLP_a(mem *memory, reg *register, instr *instruction) int {
 	mem.write8(reg.readDuo(reg_hl), reg.A.val())
 	reg.incrDuo(reg_hl)
+	return instr.duration_action
 }
 
-func inc_hl(mem *memory, reg *register) {
+func inc_hl(mem *memory, reg *register, instr *instruction) int {
 	reg.incrDuo(reg_hl)
+	return instr.duration_action
 }
 
-func inc_de(mem *memory, reg *register) {
+func inc_de(mem *memory, reg *register, instr *instruction) int {
 	reg.incrDuo(reg_de)
+	return instr.duration_action
 }
 
-func ret(mem *memory, reg *register) {
+func ret(mem *memory, reg *register, instr *instruction) int {
 	addr := popStack16(mem, reg)
 	reg.PC = halfWordRegister(addr)
+	return instr.duration_action
 }
 
-func ld_a_e(mem *memory, reg *register) {
+func ld_a_e(mem *memory, reg *register, instr *instruction) int {
 	reg.A = reg.E
+	return instr.duration_action
 }
 
-func cp_d8(mem *memory, reg *register) {
+func cp_d8(mem *memory, reg *register, instr *instruction) int {
 	arg := readArgByte(mem, reg, 1)
 	reg.Flag.Z = reg.A.val() == arg
 	reg.Flag.N = true
 	reg.Flag.H = false // TODO: Check borrow
 	reg.Flag.C = reg.A.val() < arg
+	return instr.duration_action
 }
 
-func ld_A16_A(mem *memory, reg *register) {
+func ld_A16_A(mem *memory, reg *register, instr *instruction) int {
 	mem.write8(readArgHalfword(mem, reg, 1), reg.A.val())
+	return instr.duration_action
 }

@@ -4,11 +4,17 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/veandco/go-sdl2/sdl"
+	"time"
 )
 
 var _ = spew.Config
 
-func Run(cart []uint8, bootrom []uint8) {
+const (
+	screen_update_cycles = 69905
+	fps                  = 60
+)
+
+func Run(cart []uint8, bootrom []uint8, renderer *sdl.Renderer) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("There was an error: %s", r)
@@ -18,50 +24,59 @@ func Run(cart []uint8, bootrom []uint8) {
 	if ci.ramSize != ram_none || ci.romSize != rom_kbit_256 {
 		panic("Cartridge not supported")
 	}
+	running := true
+	for running {
+		i := 0
+		start := time.Now()
+		for i < screen_update_cycles {
+			instrLength := executeInstruction(mem, reg, instrMap, cbInstrMap)
+			//fmt.Printf("Instr time: %d\n", instrLength )
+			i += instrLength
+			// TODO: Update timers
+			// TODO: Update Graphics
+			// TODO: Handle interrupts
+		}
+		updateScreen(renderer)
 
-	fmt.Println("Open window")
-	sdl.Init(sdl.INIT_EVERYTHING)
-
-	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		800, 600, sdl.WINDOW_SHOWN)
-	if err != nil {
-		panic(err)
+		elapsed := time.Since(start)
+		ticks := float64(elapsed.Nanoseconds()) * 1E-6
+		if ticks < 1000.0/fps {
+			sdl.Delay(uint32((1000 / fps) - ticks))
+		}
+		fmt.Printf("Time elapsed: %s - ticks: %f\n", elapsed, ticks)
 	}
-	defer window.Destroy()
+}
 
-	surface, err := window.GetSurface()
-	rect := sdl.Rect{0, 0, 200, 200}
-	surface.FillRect(&rect,0xffff0000)
-	window.UpdateSurface()
+func updateScreen(renderer *sdl.Renderer) {
 
-	for {
-		instructionCode := mem.read8(reg.PC.val())
-		instr, ok := (*instrMap)[instructionCode]
+	renderer.Present()
 
-		fmt.Printf("Mem at 0x0104: %#02x", mem.read8(0x0104))
+}
 
+// Executes the next instruction at the PC. Returns the length (in cycles) of the instructione
+func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]instruction, cbInstrMap *map[uint8]cbInstruction) int {
+	instructionCode := mem.read8(reg.PC.val())
+	instr, ok := (*instrMap)[instructionCode]
+
+	if !ok {
+		panic(fmt.Sprintf("Unrecognized instruction %#02x at address %#04x", instructionCode, reg.PC.val()))
+	}
+
+	if instr.name != "CB" {
+		//fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
+		cycles := instr.executor(mem, reg, &instr)
+		reg.PC = halfWordRegister(reg.PC.val() + uint16(instr.bytes))
+		return cycles
+	} else {
+		cbCode := mem.read8(reg.PC.val() + 1)
+		cb, ok := (*cbInstrMap)[cbCode]
 		if !ok {
-			spew.Dump(mem)
-			spew.Dump(reg)
-			panic(fmt.Sprintf("Unrecognized instruction %#02x at address %#04x", instructionCode, reg.PC.val()))
+			panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, reg.PC.val()+1))
 		}
-
-		if instr.name != "CB" {
-			fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
-			instr.executor(mem, reg)
-			reg.PC = halfWordRegister(reg.PC.val() + uint16(instr.bytes))
-		} else {
-			cbCode := mem.read8(reg.PC.val() + 1)
-			cb, ok := (*cbInstrMap)[cbCode]
-			if !ok {
-				spew.Dump(mem)
-				spew.Dump(reg)
-				panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, reg.PC.val() + 1))
-			}
-			fmt.Printf("%#04x\t%s %s\n", reg.PC.val(), instr.name, cb.name)
-			cb.executor(mem, reg)
-			reg.PC = halfWordRegister(reg.PC.val() + uint16(cb.bytes))
-		}
+		//fmt.Printf("%#04x\t%s %s\n", reg.PC.val(), instr.name, cb.name)
+		cycles := cb.executor(mem, reg, &cb)
+		reg.PC = halfWordRegister(reg.PC.val() + uint16(cb.bytes))
+		return cycles + 4
 	}
 }
 
@@ -83,7 +98,7 @@ func popStack8(mem *memory, reg *register) uint8 {
 func popStack16(mem *memory, reg *register) uint16 {
 	least := popStack8(mem, reg)
 	most := popStack8(mem, reg)
-	val := uint16(most) << 8 | uint16(least)
+	val := uint16(most)<<8 | uint16(least)
 	return val
 }
 
