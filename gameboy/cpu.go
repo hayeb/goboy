@@ -11,15 +11,10 @@ var _ = spew.Config
 
 const (
 	screen_update_cycles = 69905
-	fps                  = 60
+	fps float64                  = 60.0
 )
 
-func Run(cart []uint8, bootrom []uint8, renderer *sdl.Renderer) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("There was an error: %s", r)
-		}
-	}()
+func Run(cart *[]uint8, bootrom *[]uint8, renderer *sdl.Renderer) {
 	ci, mem, reg, instrMap, cbInstrMap := initializeSystem(cart, bootrom)
 	if ci.ramSize != ram_none || ci.romSize != rom_kbit_256 {
 		panic("Cartridge not supported")
@@ -30,7 +25,7 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Renderer) {
 		start := time.Now()
 		for i < screen_update_cycles {
 			instrLength := executeInstruction(mem, reg, instrMap, cbInstrMap)
-			//fmt.Printf("Instr time: %d\n", instrLength )
+
 			i += instrLength
 			// TODO: Update timers
 			// TODO: Update Graphics
@@ -39,11 +34,13 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Renderer) {
 		updateScreen(renderer)
 
 		elapsed := time.Since(start)
-		ticks := float64(elapsed.Nanoseconds()) * 1E-6
+		var ticks float64 = float64(elapsed.Nanoseconds()) * float64(1E-6)
 		if ticks < 1000.0/fps {
-			sdl.Delay(uint32((1000 / fps) - ticks))
+			wait := (1000.0 / fps) - ticks
+			fmt.Printf("Waiting: %fms\n", wait)
+			sdl.Delay(uint32(wait))
 		}
-		fmt.Printf("Time elapsed: %s - ticks: %f\n", elapsed, ticks)
+
 	}
 }
 
@@ -54,7 +51,7 @@ func updateScreen(renderer *sdl.Renderer) {
 }
 
 // Executes the next instruction at the PC. Returns the length (in cycles) of the instructione
-func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]instruction, cbInstrMap *map[uint8]cbInstruction) int {
+func executeInstruction(mem *memory, reg *register, instrMap *map[uint8](*instruction), cbInstrMap *map[uint8](*cbInstruction)) int {
 	instructionCode := mem.read8(reg.PC.val())
 	instr, ok := (*instrMap)[instructionCode]
 
@@ -64,7 +61,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]instruct
 
 	if instr.name != "CB" {
 		//fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
-		cycles := instr.executor(mem, reg, &instr)
+		cycles := instr.executor(mem, reg, instr)
 		reg.PC = halfWordRegister(reg.PC.val() + uint16(instr.bytes))
 		return cycles
 	} else {
@@ -74,7 +71,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]instruct
 			panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, reg.PC.val()+1))
 		}
 		//fmt.Printf("%#04x\t%s %s\n", reg.PC.val(), instr.name, cb.name)
-		cycles := cb.executor(mem, reg, &cb)
+		cycles := cb.executor(mem, reg, cb)
 		reg.PC = halfWordRegister(reg.PC.val() + uint16(cb.bytes))
 		return cycles + 4
 	}
@@ -120,7 +117,7 @@ func readArgHalfword(mem *memory, reg *register, offset int) uint16 {
 	return mem.read16(reg.PC.val() + uint16(offset))
 }
 
-func initializeSystem(cart []uint8, bootrom []uint8) (*cartridgeInfo, *memory, *register, *map[uint8]instruction, *map[uint8]cbInstruction) {
+func initializeSystem(cart *[]uint8, bootrom *[]uint8) (*cartridgeInfo, *memory, *register, *map[uint8]*instruction, *map[uint8]*cbInstruction) {
 	cartridgeInfo := createCartridgeInfo(cart)
 	instructionMap := createInstructionMap()
 	cbInstrucionMap := createCBInstructionMap()

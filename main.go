@@ -4,6 +4,7 @@ import (
 	"github.com/hayeb/goboy/gameboy"
 	"github.com/veandco/go-sdl2/sdl"
 	"io/ioutil"
+	"fmt"
 )
 
 func check(e error) {
@@ -30,6 +31,12 @@ func main() {
 
 	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
 
-	gameboy.Run(cartridge, bootrom, renderer)
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("There was an error: %s", r)
+		}
+	}()
+
+	gameboy.Run(&cartridge, &bootrom, renderer)
 
 }

@@ -32,18 +32,18 @@ const (
 	interrupt_enable_register = 11
 )
 
-func memInit(bootrom []uint8, cartridge []uint8) *memory {
+func memInit(bootrom *[]uint8, cartridge *[]uint8) *memory {
 	b0 := [16 * 1024]uint8{}
 	sw := [16 * 1024]uint8{}
-	for index, item := range bootrom {
+	for index, item := range (*bootrom) {
 		b0[index] = item
 	}
 	// TODO: Implement switching of the bootrom page when memory address 0xFE is executed
 	for i := 0xFF; i < len(b0); i++ {
-		b0[i] = cartridge[i]
+		b0[i] = (*cartridge)[i]
 	}
 	for j := 0; j < len(sw); j++ {
-		sw[j] = cartridge[j+len(sw)]
+		sw[j] = (*cartridge)[j+len(sw)]
 	}
 	return &memory{
 		b0,
@@ -91,7 +91,7 @@ func map_addr(addr uint16) int {
 	}
 }
 
-func (memory memory) read8(address uint16) uint8 {
+func (memory *memory) read8(address uint16) uint8 {
 	switch map_addr(address) {
 	case bank_0:
 		return memory.bank_0[address]

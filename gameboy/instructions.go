@@ -25,8 +25,8 @@ type instruction struct {
 
 type instructionExecutor func(mem *memory, reg *register, instr *instruction) int
 
-func createInstructionMap() *map[uint8]instruction {
-	return &map[uint8]instruction{
+func createInstructionMap() *map[uint8]*instruction {
+	return &map[uint8]*instruction{
 		0x05: newInstruction("DEC B", 1, 4, dec_b),
 		0x06: newInstruction("LD B, d8", 2, 8, ld_b_d8),
 		0x0c: newInstruction("INC C", 1, 4, inc_c),
@@ -58,8 +58,8 @@ func createInstructionMap() *map[uint8]instruction {
 	}
 }
 
-func newConditionalInstruction(name string, length int, actionDuration int, noopDuration int, fp func(mem *memory, reg *register, instr *instruction) int) instruction {
-	return instruction{
+func newConditionalInstruction(name string, length int, actionDuration int, noopDuration int, fp func(mem *memory, reg *register, instr *instruction) int) *instruction {
+	return &instruction{
 		name:            name,
 		bytes:           length,
 		duration_action: actionDuration,
@@ -68,7 +68,7 @@ func newConditionalInstruction(name string, length int, actionDuration int, noop
 	}
 }
 
-func newInstruction(name string, length int, duration int, fp func(mem *memory, reg *register, instr *instruction) int) instruction {
+func newInstruction(name string, length int, duration int, fp func(mem *memory, reg *register, instr *instruction) int) *instruction {
 	return newConditionalInstruction(name, length, duration, 0, fp)
 }
 
