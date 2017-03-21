@@ -1,10 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"github.com/hayeb/goboy/gameboy"
 	"github.com/veandco/go-sdl2/sdl"
 	"io/ioutil"
-	"fmt"
+	"os"
 )
 
 func check(e error) {
@@ -33,7 +34,7 @@ func main() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("There was an error: %s", r)
+			fmt.Fprintf(os.Stderr, "Error: %s", r)
 		}
 	}()
 

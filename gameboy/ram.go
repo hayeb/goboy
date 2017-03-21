@@ -1,12 +1,15 @@
 package gameboy
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 type memory struct {
 	bank_0                    [16 * 1024]uint8 // 0x0000 (16 kB)
-	switchable_rom_bank       [16 * 1024]uint8 // 0x4000 (16 kB)
+	switchable_rom_bank       *[0x200000]uint8 // 0x4000 (16 kB)
 	video_ram                 [8 * 1024]uint8  // 0x8000 (8 kB)
-	switchable_ram_bank       [8 * 1024]uint8  // 0xA000 (8 kB)
+	switchable_ram_bank       *[8 * 1024]uint8  // 0xA000 (8 kB)
 	internal_ram_8kb          [8 * 1024]uint8  // 0xC000 (8 kB)
 	echo_internal_ram         [8 * 1024]uint8  // 0xE000 (8 kB)
 	sprite_attrib_memory      [7680]uint8      // 0xFE00 (7680 B)
@@ -15,6 +18,12 @@ type memory struct {
 	empty2                    [52]uint8        // 0xFF4C (52 B)
 	internal_ram              [127]uint8       // 0xFF80 (127 B)
 	interrupt_enable_register uint8            // 0xFFFF (1 B)
+
+	rom_bank int
+	ram_bank int
+
+	rom_mbc1 bool
+	rom_mbc2 bool
 }
 
 const (
@@ -30,12 +39,14 @@ const (
 	empty2                    = 9
 	internal_ram              = 10
 	interrupt_enable_register = 11
+
+	no_ram_banks 			  = 4
 )
 
 func memInit(bootrom *[]uint8, cartridge *[]uint8) *memory {
 	b0 := [16 * 1024]uint8{}
 	sw := [16 * 1024]uint8{}
-	for index, item := range (*bootrom) {
+	for index, item := range *bootrom {
 		b0[index] = item
 	}
 	// TODO: Implement switching of the bootrom page when memory address 0xFE is executed
@@ -45,6 +56,8 @@ func memInit(bootrom *[]uint8, cartridge *[]uint8) *memory {
 	for j := 0; j < len(sw); j++ {
 		sw[j] = (*cartridge)[j+len(sw)]
 	}
+	mbc1, mbc2 := romBankMode(b0[0x147])
+
 	return &memory{
 		b0,
 		sw,
@@ -58,6 +71,11 @@ func memInit(bootrom *[]uint8, cartridge *[]uint8) *memory {
 		[52]uint8{},
 		[127]uint8{},
 		0,
+		1,
+		0,
+		mbc1,
+		mbc2,
+
 	}
 }
 
@@ -122,7 +140,9 @@ func (memory *memory) read16(address uint16) uint16 {
 func (mem *memory) write8(address uint16, val uint8) {
 	switch map_addr(address) {
 	case bank_0:
-		mem.bank_0[address] = val
+		// TODO: Implement ROM bank switching
+		// TODO: Implement RAM bank switching
+		panic(fmt.Sprintf("Attempted write to memory bank 0 address %#04x", address))
 	case switchable_rom_bank:
 		mem.switchable_rom_bank[address-0x4000] = val
 	case video_ram:
@@ -153,4 +173,19 @@ func (mem *memory) write16(address uint16, val uint16) {
 	default:
 		panic(fmt.Sprintf("Write halfword not yet implemented for address %#04x", address))
 	}
+}
+
+func romBankMode(byte_0x147 uint8) (bool, bool) {
+	switch (byte_0x147) {
+	case 1:
+	case 2:
+	case 3:
+			return true, false
+	case 5:
+	case 6:
+			return false, true
+	default:
+			fmt.Fprintln(os.Stderr, "ROM bank mode could not be determined. Defaulting to ROM ONLY",)
+	}
+	return false, false
 }

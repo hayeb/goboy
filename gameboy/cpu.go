@@ -10,8 +10,8 @@ import (
 var _ = spew.Config
 
 const (
-	screen_update_cycles = 69905
-	fps float64                  = 60.0
+	screen_update_cycles         = 69905
+	fps                  float64 = 60.0
 )
 
 func Run(cart *[]uint8, bootrom *[]uint8, renderer *sdl.Renderer) {
@@ -37,7 +37,6 @@ func Run(cart *[]uint8, bootrom *[]uint8, renderer *sdl.Renderer) {
 		var ticks float64 = float64(elapsed.Nanoseconds()) * float64(1E-6)
 		if ticks < 1000.0/fps {
 			wait := (1000.0 / fps) - ticks
-			fmt.Printf("Waiting: %fms\n", wait)
 			sdl.Delay(uint32(wait))
 		}
 
@@ -45,9 +44,7 @@ func Run(cart *[]uint8, bootrom *[]uint8, renderer *sdl.Renderer) {
 }
 
 func updateScreen(renderer *sdl.Renderer) {
-
 	renderer.Present()
-
 }
 
 // Executes the next instruction at the PC. Returns the length (in cycles) of the instructione
