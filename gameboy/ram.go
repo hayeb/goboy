@@ -6,24 +6,30 @@ import (
 )
 
 type memory struct {
-	bank_0                    [16 * 1024]uint8 // 0x0000 (16 kB)
-	switchable_rom_bank       *[0x200000]uint8 // 0x4000 (16 kB)
-	video_ram                 [8 * 1024]uint8  // 0x8000 (8 kB)
-	switchable_ram_bank       *[8 * 1024]uint8  // 0xA000 (8 kB)
-	internal_ram_8kb          [8 * 1024]uint8  // 0xC000 (8 kB)
-	echo_internal_ram         [8 * 1024]uint8  // 0xE000 (8 kB)
-	sprite_attrib_memory      [7680]uint8      // 0xFE00 (7680 B)
-	empty1                    [96]uint8        // 0xFEA0 (96 B)
-	io_ports                  [76]uint8        // 0xFF00 (67 B)
-	empty2                    [52]uint8        // 0xFF4C (52 B)
-	internal_ram              [127]uint8       // 0xFF80 (127 B)
-	interrupt_enable_register uint8            // 0xFFFF (1 B)
+	bank_0                    [16 * 1024]uint8    // 0x0000 (16 kB)
+	switchable_rom_bank       [16 * 1024]uint8    // 0x4000 (16 kB)
+	video_ram                 [8 * 1024]uint8     // 0x8000 (8 kB)
+	switchable_ram_bank       [4 * 8 * 1024]uint8 // 0xA000 (8 kB)
+	internal_ram_8kb          [8 * 1024]uint8     // 0xC000 (8 kB)
+	echo_internal_ram         [8 * 1024]uint8     // 0xE000 (8 kB)
+	sprite_attrib_memory      [7680]uint8         // 0xFE00 (7680 B)
+	empty1                    [96]uint8           // 0xFEA0 (96 B)
+	io_ports                  [76]uint8           // 0xFF00 (67 B)
+	empty2                    [52]uint8           // 0xFF4C (52 B)
+	internal_ram              [127]uint8          // 0xFF80 (127 B)
+	interrupt_enable_register uint8               // 0xFFFF (1 B)
+	memory_settings           memorySettings
+}
 
-	rom_bank int
-	ram_bank int
+type memorySettings struct {
+	mbc1 bool
+	mbc2 bool
 
-	rom_mbc1 bool
-	rom_mbc2 bool
+	romBanking bool
+	ramEnabled bool
+
+	currentROMBank int
+	currentRAMBank int
 }
 
 const (
@@ -39,11 +45,9 @@ const (
 	empty2                    = 9
 	internal_ram              = 10
 	interrupt_enable_register = 11
-
-	no_ram_banks 			  = 4
 )
 
-func memInit(bootrom *[]uint8, cartridge *[]uint8) *memory {
+func memInit(bootrom *[]uint8, cartridge *[]uint8, rom_type_code int) *memory {
 	b0 := [16 * 1024]uint8{}
 	sw := [16 * 1024]uint8{}
 	for index, item := range *bootrom {
@@ -56,26 +60,23 @@ func memInit(bootrom *[]uint8, cartridge *[]uint8) *memory {
 	for j := 0; j < len(sw); j++ {
 		sw[j] = (*cartridge)[j+len(sw)]
 	}
-	mbc1, mbc2 := romBankMode(b0[0x147])
 
 	return &memory{
-		b0,
-		sw,
-		[8 * 1024]uint8{},
-		[8 * 1024]uint8{},
-		[8 * 1024]uint8{},
-		[8 * 1024]uint8{},
-		[7680]uint8{},
-		[96]uint8{},
-		[76]uint8{},
-		[52]uint8{},
-		[127]uint8{},
-		0,
-		1,
-		0,
-		mbc1,
-		mbc2,
-
+		bank_0:                    b0,
+		switchable_rom_bank:       sw,
+		video_ram:                 [8 * 1024]uint8{},
+		switchable_ram_bank:       [4 * 8 * 1024]uint8{},
+		internal_ram_8kb:          [8 * 1024]uint8{},
+		echo_internal_ram:         [8 * 1024]uint8{},
+		sprite_attrib_memory:      [7680]uint8{},
+		empty1:                    [96]uint8{},
+		io_ports:                  [76]uint8{},
+		empty2:                    [52]uint8{},
+		internal_ram:              [127]uint8{},
+		interrupt_enable_register: 0,
+		memory_settings:           memorySettings{
+			romBanking: true,
+		},
 	}
 }
 
@@ -114,7 +115,9 @@ func (memory *memory) read8(address uint16) uint8 {
 	case bank_0:
 		return memory.bank_0[address]
 	case switchable_rom_bank:
-		return memory.switchable_rom_bank[address-0x4000]
+		return memory.switchable_rom_bank[address-0x4000+uint16(memory.memory_settings.currentROMBank)*0x4000]
+	case switchable_ram_bank:
+		return memory.switchable_ram_bank[address-0xA000+uint16(memory.memory_settings.currentRAMBank*0x2000)]
 	case io_ports:
 		return memory.io_ports[address-0xff00]
 	case internal_ram:
@@ -129,7 +132,11 @@ func (memory *memory) read16(address uint16) uint16 {
 	case bank_0:
 		return uint16(memory.bank_0[address]) | (uint16(memory.bank_0[address+1]) << 8)
 	case switchable_rom_bank:
-		return uint16(memory.bank_0[address-0x4000]) | (uint16(memory.bank_0[address-0x4000+1]) << 8)
+		taddress := address - 0x4000 + uint16(memory.memory_settings.currentROMBank)*0x4000
+		return uint16(memory.bank_0[taddress]) | (uint16(memory.bank_0[taddress+1]) << 8)
+	case switchable_ram_bank:
+		taddr := address - 0xA000 + uint16(memory.memory_settings.currentRAMBank*0x2000)
+		return uint16(memory.switchable_ram_bank[taddr]) | uint16(memory.switchable_ram_bank[taddr+1])
 	case io_ports:
 		return uint16(memory.io_ports[address-0xff00]) | (uint16(memory.io_ports[address-0xff00+1]) << 8)
 	default:
@@ -140,11 +147,8 @@ func (memory *memory) read16(address uint16) uint16 {
 func (mem *memory) write8(address uint16, val uint8) {
 	switch map_addr(address) {
 	case bank_0:
-		// TODO: Implement ROM bank switching
-		// TODO: Implement RAM bank switching
-		panic(fmt.Sprintf("Attempted write to memory bank 0 address %#04x", address))
 	case switchable_rom_bank:
-		mem.switchable_rom_bank[address-0x4000] = val
+		mem.doBankingAction(address, val)
 	case video_ram:
 		mem.video_ram[address-0x8000] = val
 	case switchable_ram_bank:
@@ -175,17 +179,69 @@ func (mem *memory) write16(address uint16, val uint16) {
 	}
 }
 
-func romBankMode(byte_0x147 uint8) (bool, bool) {
-	switch (byte_0x147) {
-	case 1:
-	case 2:
-	case 3:
-			return true, false
-	case 5:
-	case 6:
-			return false, true
-	default:
-			fmt.Fprintln(os.Stderr, "ROM bank mode could not be determined. Defaulting to ROM ONLY",)
+func (mem *memory) doBankingAction(address uint16, val uint8) {
+	settings := mem.memory_settings
+	if address < 0x2000 && settings.mbc1 || settings.mbc2 {
+		mem.doRAMBankEnable(address, val)
+	} else if address >= 0x2000 && address < 0x4000 && settings.mbc1 || settings.mbc2 {
+		mem.doChangeLoROMBank(address, val)
+	} else if address > 0x4000 && address < 0x6000 {
+		if settings.mbc1 {
+			if settings.romBanking {
+				mem.doChangeHiRomBank(val)
+			} else {
+				mem.doRAMBankChange(val)
+			}
+		}
+	} else if address >= 0x6000 && address < 0x8000 && settings.mbc1 {
+		mem.doChangeROMRAMMode(val)
 	}
-	return false, false
+}
+
+func (mem *memory) doRAMBankEnable(address uint16, val uint8) {
+	fmt.Println(os.Stderr, "Performing RAM bank enable switch")
+	settings := &mem.memory_settings
+	if settings.mbc2 && address&(1<<4) == 1 {
+		return
+	}
+
+	var test uint8 = val & 0xf
+	if test == 0xA {
+		settings.ramEnabled = true
+	} else if test == 0x0 {
+		settings.ramEnabled = false
+	}
+}
+
+func (mem *memory) doChangeLoROMBank(address uint16, val uint8) {
+	fmt.Println(os.Stderr, "Performing LoROM bank switching")
+	if mem.memory_settings.mbc2 {
+		mem.memory_settings.currentROMBank = int(val & 0xF)
+		return
+	}
+	var lower5 uint8 = val & 31
+	mem.memory_settings.currentROMBank &= 224
+	mem.memory_settings.currentROMBank |= int(lower5)
+}
+
+func (mem *memory) doChangeHiRomBank(val uint8) {
+	fmt.Println(os.Stderr, "Performing HiROM bank switching")
+	mem.memory_settings.currentROMBank &= 31
+
+	val &= 224
+	mem.memory_settings.currentROMBank |= int(val)
+}
+
+func (mem *memory) doRAMBankChange(val uint8) {
+	fmt.Println(os.Stderr, "Performing RAM bank change")
+	mem.memory_settings.currentRAMBank = int(val & 0x3)
+}
+
+func (mem *memory) doChangeROMRAMMode(val uint8) {
+	fmt.Println(os.Stderr, "Performing ROM/RAM mode change")
+	newData := val & 0x1
+	mem.memory_settings.romBanking = newData == 0
+	if mem.memory_settings.romBanking {
+		mem.memory_settings.currentRAMBank = 0
+	}
 }

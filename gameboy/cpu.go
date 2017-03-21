@@ -118,7 +118,7 @@ func initializeSystem(cart *[]uint8, bootrom *[]uint8) (*cartridgeInfo, *memory,
 	cartridgeInfo := createCartridgeInfo(cart)
 	instructionMap := createInstructionMap()
 	cbInstrucionMap := createCBInstructionMap()
-	mem := memInit(bootrom, cart)
+	mem := memInit(bootrom, cart, int(cartridgeInfo.CartType))
 	registers := new(register)
 	return cartridgeInfo, mem, registers, instructionMap, cbInstrucionMap
 }
