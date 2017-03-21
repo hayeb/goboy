@@ -150,6 +150,7 @@ func (mem *memory) write8(address uint16, val uint8) {
 	case switchable_rom_bank:
 		mem.doBankingAction(address, val)
 	case video_ram:
+		fmt.Println("Write to video RAM not implemented")
 		mem.video_ram[address-0x8000] = val
 	case switchable_ram_bank:
 		mem.switchable_ram_bank[address-0xa000] = val
@@ -158,6 +159,7 @@ func (mem *memory) write8(address uint16, val uint8) {
 	case echo_internal_ram_8kb:
 		mem.internal_ram_8kb[address-0x2000-0xc000] = val
 	case sprite_attrib_memory:
+		panic(fmt.Sprint("Write to sprite attribute memory not implemented"))
 		mem.sprite_attrib_memory[address-0xfe00] = val
 	case empty1:
 		mem.empty1[address-0xfea0] = val

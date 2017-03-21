@@ -30,17 +30,22 @@ func createInstructionMap() *map[uint8]*instruction {
 		0x05: newInstruction("DEC B", 1, 4, dec_b),
 		0x06: newInstruction("LD B, d8", 2, 8, ld_b_d8),
 		0x0c: newInstruction("INC C", 1, 4, inc_c),
+		0x0d: newInstruction("DEC C", 1, 4, dec_c),
 		0x0e: newInstruction("LD C", 2, 8, ld_c),
 		0x11: newInstruction("LD DE, d16", 3, 12, ld_de_d16),
 		0x13: newInstruction("INC DE", 1, 8, inc_de),
 		0x17: newInstruction("RLA", 1, 4, rla),
+		0x18: newInstruction("JR r8", 2, 12, jr_r8),
 		0x1a: newInstruction("LD A,(DE)", 1, 8, ld_a_DE),
-		0x20: newConditionalInstruction("JR NZ", 2, 12, 8, jr_nz),
+		0x20: newConditionalInstruction("JR NZ,r8", 2, 12, 8, jr_nz),
 		0x21: newInstruction("LD HL", 3, 12, ld_hl),
 		0x22: newInstruction("LD (HL+),A", 1, 8, ld_HLP_a),
 		0x23: newInstruction("INC HL", 1, 8, inc_hl),
+		0x28: newConditionalInstruction("JR Z,r8", 2, 12, 8, jr_z_r8),
+		0x2e: newInstruction("LD L,d8", 2, 8, ld_l_d8),
 		0x31: newInstruction("LD SP", 3, 12, ld_sp),
 		0x32: newInstruction("LDD (HL-),A", 1, 8, ldd_HL_a),
+		0x3d: newInstruction("DEC A", 1, 4, dec_a),
 		0x3e: newInstruction("LD A", 2, 8, ld_a),
 		0x4f: newInstruction("LD C,A", 1, 4, ld_c_a),
 		0x77: newInstruction("LD (HL),A", 1, 8, ld_HL_a),
@@ -265,3 +270,45 @@ func ld_A16_A(mem *memory, reg *register, instr *instruction) int {
 	mem.write8(readArgHalfword(mem, reg, 1), reg.A.val())
 	return instr.duration_action
 }
+
+func dec_a(mem *memory, reg *register, instr *instruction) int {
+	val := reg.A.val()
+	reg.A = byteRegister(val - uint8(1))
+	reg.Flag.Z = reg.A == 0
+	reg.Flag.N = true
+	reg.Flag.H = (val&0xf0)-(1&0xf0)&0x8 == 0x8
+	return instr.duration_action
+}
+
+
+func jr_z_r8(mem *memory, reg *register, instr *instruction) int {
+	if (reg.Flag.Z) {
+		reg.PC = halfWordRegister(reg.PC.val() + uint16(readArgByte(mem, reg, 1)))
+		return instr.duration_action
+	}
+	return instr.duration_noop
+}
+
+func dec_c(mem *memory, reg *register, instr *instruction) int {
+	val := reg.C.val()
+	reg.C = byteRegister(val - uint8(1))
+	reg.Flag.Z = reg.C == 0
+	reg.Flag.N = true
+	reg.Flag.H = (val&0xf0)-(1&0xf0)&0x8 == 0x8
+	return instr.duration_action
+}
+
+
+func ld_l_d8(mem *memory, reg *register, instr *instruction) int {
+	reg.L = byteRegister(readArgByte(mem, reg, 1))
+	return instr.duration_action
+}
+
+func jr_r8(mem *memory, reg *register, instr *instruction) int {
+	old_pc := reg.PC.val()
+	arg := int8(readArgByte(mem, reg, 1))
+	reg.PC = halfWordRegister(uint16(int(old_pc) + int(arg)));
+	return instr.duration_action
+}
+
+

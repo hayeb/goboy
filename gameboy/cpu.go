@@ -57,7 +57,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8](*instru
 	}
 
 	if instr.name != "CB" {
-		//fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
+		fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
 		cycles := instr.executor(mem, reg, instr)
 		reg.PC = halfWordRegister(reg.PC.val() + uint16(instr.bytes))
 		return cycles
@@ -67,7 +67,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8](*instru
 		if !ok {
 			panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, reg.PC.val()+1))
 		}
-		//fmt.Printf("%#04x\t%s %s\n", reg.PC.val(), instr.name, cb.name)
+		fmt.Printf("%#04x\t%s %s\n", reg.PC.val(), instr.name, cb.name)
 		cycles := cb.executor(mem, reg, cb)
 		reg.PC = halfWordRegister(reg.PC.val() + uint16(cb.bytes))
 		return cycles + 4
