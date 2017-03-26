@@ -195,7 +195,6 @@ func (mem *memory) handleSpecificAddress(address uint16, val uint8) bool {
 	if address == 0xff44 {
 		// Reset the scanline to 0
 		fmt.Println("Resetting scanline register 0xff44 to 0")
-		mem.io_ports[0xff44-0xFF00] = 0
 		return true
 	} else if address == 0xff46 {
 		panic("DMAtransfer")

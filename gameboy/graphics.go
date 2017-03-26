@@ -17,8 +17,24 @@ type graphics struct {
 	renderer      *sdl.Renderer
 	cartridgeInfo *cartridgeInfo
 
-	scanlineCounter int
-	lcd_status 	int
+	scroll_y uint8
+	scroll_x uint8
+
+	current_scan_line uint16
+	background_palette uint8
+
+	lcdControl lcdControl
+}
+
+type lcdControl struct {
+	backgroundEnabled bool
+	spritesEnabled bool
+	spritesSize bool
+	backgorundTileMap bool
+	backgroundTileSet bool
+	windowEnabled bool
+	windowTileMap bool
+	displayEnabled bool
 }
 
 func createGraphics(mem *memory, rend *sdl.Renderer, ci *cartridgeInfo) *graphics {
@@ -26,7 +42,6 @@ func createGraphics(mem *memory, rend *sdl.Renderer, ci *cartridgeInfo) *graphic
 		memory:        mem,
 		renderer:      rend,
 		cartridgeInfo: ci,
-		scanlineCounter: 456,
 	}
 }
 
@@ -34,14 +49,14 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 	graphics.setLCDStatus()
 
 	if testBit(graphics.memory.read8(0xff40), 7) {
-		graphics.scanlineCounter -= instructionLength
+		graphics.current_scan_line -= uint16(instructionLength)
 	}
 
 	if graphics.memory.read8(0xff44) > 0x99 {
 		graphics.memory.io_ports[0xff44-0xFF00] = 0
 	}
 
-	if graphics.scanlineCounter <= 0 {
+	if graphics.current_scan_line <= 0 {
 		graphics.drawCurrentLine()
 	}
 }
@@ -50,9 +65,8 @@ func (graphics *graphics) setLCDStatus() {
 	status := graphics.memory.read8(0xFF41)
 
 	if !graphics.isLCDEnabled() {
-		graphics.scanlineCounter = 456
+		graphics.current_scan_line = 456
 		graphics.memory.io_ports[0xff44 - 0xFF00] = 0
-		graphics.lcd_status &= 252
 		status = setBit(status, 0)
 		graphics.memory.write8(0xff41, status)
 		return
@@ -69,15 +83,15 @@ func (graphics *graphics) setLCDStatus() {
 		status = resetBit(status, 1)
 		reqInt = testBit(status, 4)
 	} else {
-		mode2bounds := 456 - 80
-		mode3bounds := mode2bounds - 172
+		var mode2bounds uint16 = 456 - 80
+		var mode3bounds uint16 = mode2bounds - 172
 
-		if (graphics.scanlineCounter >= mode2bounds) {
+		if (graphics.current_scan_line >= uint16(mode2bounds)) {
 			mode = 2
 			status = setBit(status, 1)
 			status = resetBit(status, 0)
 			reqInt = testBit(status, 5)
-		} else if (graphics.scanlineCounter >= mode3bounds) {
+		} else if (graphics.current_scan_line >= uint16(mode3bounds)) {
 			mode = 3
 			status = setBit(status, 1)
 			status = setBit(status, 0)
@@ -116,7 +130,6 @@ func (graphics *graphics) drawCurrentLine() {
 	}
 
 	graphics.memory.io_ports[0xff44-0xFF00] = graphics.memory.io_ports[0xff44-0xFF00] + 1
-	graphics.scanlineCounter = 456
 
 	scanLine := graphics.memory.read8(0xff44)
 	if scanLine == 0x90 {
@@ -145,80 +158,29 @@ func (graphics *graphics) renderTiles(lcdControl uint8) {
 		return
 	}
 
-	var tileData uint16 = 0
+	var tileData uint16 = 0x8000
 	var backgroundMemory uint16 = 0
-	var unsig bool = true
 
-	//var sY uint8 = graphics.memory.read8(0xff42)
-	var sY uint8 = 0
-	//fmt.Printf("sY: %#02x\n", sY)
+	var sY uint8 = graphics.memory.read8(0xff42)
 	var sX uint8 = graphics.memory.read8(0xff43)
-	fmt.Println("ScrolyX: ", sX)
-	fmt.Println("ScrolyY: ", sY)
-	var wY uint8 = graphics.memory.read8(0xff4a)
-	var wX uint8 = graphics.memory.read8(0xff4b) - 7
-	usingWindow := false
 
-	if testBit(lcdControl, 5) && wY <= graphics.memory.read8(0xff44) {
-		usingWindow = true
-	}
-
-	if testBit(lcdControl, 4) {
-		tileData = 0x8000
+	if testBit(lcdControl, 3) {
+		backgroundMemory = 0x9c00
 	} else {
-		tileData = 0x8800
-		unsig = false
+		backgroundMemory = 0x9800
 	}
 
-	if !usingWindow {
-		if testBit(lcdControl, 3) {
-			backgroundMemory = 0x9c00
-		} else {
-			backgroundMemory = 0x9800
-		}
-	} else {
-		if testBit(lcdControl, 6) {
-			backgroundMemory = 0x9c00
-		} else {
-			backgroundMemory = 0x9800
-		}
-	}
-
-	var yPos uint8 = 0
-
-	if !usingWindow {
-		yPos = sY + graphics.memory.read8(0xff44)
-	} else {
-		yPos = graphics.memory.read8(0xff44) - wY
-	}
+	var yPos uint8 = sY + graphics.memory.read8(0xff44)
 
 	var tileRow uint16 = uint16(yPos/8 * 32)
 
 	for pixel := uint8(0); pixel < 160; pixel += 1 {
 		var xPos uint8 = pixel + sX
 
-		if usingWindow && pixel >= wX {
-			xPos = pixel - wX
-		}
-
 		var tileCol uint16 = uint16(xPos) / 8
-		var tileNum int16 = 0
+		var tileNum int16 = int16(int8(graphics.memory.read8(backgroundMemory + tileRow + tileCol)))
 
-		if unsig {
-			b := graphics.memory.read8(backgroundMemory + tileRow + tileCol)
-			//fmt.Printf("B: %#02x (%#04x + %#04x + %#04x)\n", b, backgroundMemory, tileRow, tileCol)
-			tileNum = int16(uint16(b))
-		} else {
-			tileNum = int16(int8(graphics.memory.read8(backgroundMemory + tileRow + tileCol)))
-		}
-
-		var tileLocation uint16 = tileData
-
-		if unsig {
-			tileLocation += uint16(int(tileNum) * 16)
-		} else {
-			tileLocation += uint16(int((tileNum + 128) * 16))
-		}
+		var tileLocation uint16 = tileData + uint16(int((tileNum + 128) * 16))
 
 		var line uint8 = 2 * (yPos % 8)
 		//fmt.Printf("Reading tile from %#04x, %#04x\n", tileLocation + uint16(line), tileLocation + uint16(line)+1)

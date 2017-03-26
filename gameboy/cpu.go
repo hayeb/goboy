@@ -103,7 +103,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8](*instru
 	}
 
 	if instr.name != "CB" {
-		//fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
+		fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
 		cycles := instr.executor(mem, reg, instr)
 		reg.PC = halfWordRegister(reg.PC.val() + uint16(instr.bytes))
 		return cycles
