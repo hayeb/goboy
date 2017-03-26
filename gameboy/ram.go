@@ -47,13 +47,20 @@ const (
 	interrupt_enable_register = 11
 )
 
+// Specific (Special) memory addresses
+const (
+	lcd_control_address      = 0xff40
+	lcd_status_address       = 0xff41
+	current_scanline_address = 0xff44
+	target_scanline_address  = 0xff45
+)
+
 func memInit(bootrom *[]uint8, cartridge *[]uint8, rom_type_code int) *memory {
 	b0 := [16 * 1024]uint8{}
 	sw := [16 * 1024]uint8{}
 	for index, item := range *bootrom {
 		b0[index] = item
 	}
-	// TODO: Implement switching of the bootrom page when memory address 0xFE is executed
 	for i := 0xFF; i < len(b0); i++ {
 		b0[i] = (*cartridge)[i]
 	}
@@ -74,7 +81,7 @@ func memInit(bootrom *[]uint8, cartridge *[]uint8, rom_type_code int) *memory {
 		empty2:                    [52]uint8{},
 		internal_ram:              [127]uint8{},
 		interrupt_enable_register: 0,
-		memory_settings:           memorySettings{
+		memory_settings: memorySettings{
 			romBanking: true,
 		},
 	}
@@ -116,12 +123,20 @@ func (memory *memory) read8(address uint16) uint8 {
 		return memory.bank_0[address]
 	case switchable_rom_bank:
 		return memory.switchable_rom_bank[address-0x4000+uint16(memory.memory_settings.currentROMBank)*0x4000]
+	case video_ram:
+		if address > 0x9900 {
+			fmt.Println(os.Stderr, "Possible interesting vedio read..S")
+		}
+		//fmt.Printf("Reading from video ram: %#04x\n", address)
+		return memory.video_ram[address - 0x8000]
 	case switchable_ram_bank:
 		return memory.switchable_ram_bank[address-0xA000+uint16(memory.memory_settings.currentRAMBank*0x2000)]
 	case io_ports:
 		return memory.io_ports[address-0xff00]
 	case internal_ram:
 		return memory.internal_ram[address-0xff80]
+	case interrupt_enable_register:
+		return memory.interrupt_enable_register
 	default:
 		panic(fmt.Sprintf("Read byte requested outside implemented memory: %x", address))
 	}
@@ -145,12 +160,14 @@ func (memory *memory) read16(address uint16) uint16 {
 }
 
 func (mem *memory) write8(address uint16, val uint8) {
+	if mem.handleSpecificAddress(address, val) {
+		return
+	}
 	switch map_addr(address) {
 	case bank_0:
 	case switchable_rom_bank:
 		mem.doBankingAction(address, val)
 	case video_ram:
-		fmt.Println("Write to video RAM not implemented")
 		mem.video_ram[address-0x8000] = val
 	case switchable_ram_bank:
 		mem.switchable_ram_bank[address-0xa000] = val
@@ -172,6 +189,18 @@ func (mem *memory) write8(address uint16, val uint8) {
 	default:
 		panic(fmt.Sprintf("Write byte not yet implemented for address: %#04x on %d", address, map_addr(address)))
 	}
+}
+
+func (mem *memory) handleSpecificAddress(address uint16, val uint8) bool {
+	if address == 0xff44 {
+		// Reset the scanline to 0
+		fmt.Println("Resetting scanline register 0xff44 to 0")
+		mem.io_ports[0xff44-0xFF00] = 0
+		return true
+	} else if address == 0xff46 {
+		panic("DMAtransfer")
+	}
+	return false
 }
 
 func (mem *memory) write16(address uint16, val uint16) {
@@ -245,5 +274,18 @@ func (mem *memory) doChangeROMRAMMode(val uint8) {
 	mem.memory_settings.romBanking = newData == 0
 	if mem.memory_settings.romBanking {
 		mem.memory_settings.currentRAMBank = 0
+	}
+}
+
+func (mem *memory) requestInterupt(interupt_type int) {
+	//fmt.Println("Interrupt requested")
+
+	mem.write8(0xff0f, setBit(mem.read8(0xff0f), uint(interupt_type)))
+}
+
+func (mem *memory) swapBootRom(cartridge *[]uint8) {
+	fmt.Println("Swapping out bootrom")
+	for i := 0; i < 0xff; i += 1 {
+		mem.bank_0[i] = (*cartridge)[i]
 	}
 }

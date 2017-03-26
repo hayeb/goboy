@@ -27,3 +27,24 @@ func btoi(b bool) int {
 func uint8tob(i uint8) bool {
 	return i != 0
 }
+
+func setBit(bit uint8, n uint) uint8 {
+	return bit | (1 << n)
+}
+
+func resetBit(bit uint8, n uint) uint8 {
+	return bit &^ (1 << n)
+}
+
+func testBit(bit uint8, n uint) bool {
+	return bit & (1 << n) != 0
+}
+
+func getBitN(but uint8, n uint) uint8 {
+	val := but & (1 << n)
+	if val == 0 {
+		return 0
+	} else {
+		return 1
+	}
+}

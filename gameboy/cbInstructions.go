@@ -39,11 +39,27 @@ func bit_7_h(_ *memory, reg *register, cbInstr *cbInstruction) int {
 }
 
 func rl_c(mem *memory, reg *register, cbInstr *cbInstruction) int {
-	newVal, carry := rLeftCarry(reg.C.val(), reg.Flag.C)
-	reg.C = byteRegister(newVal)
-	reg.Flag.Z = reg.C == 0
+	isCarrySet := reg.Flag.C
+	isMSBSet := testBit(reg.C.val(), 7)
+
+	reg.Flag.Z = false
 	reg.Flag.N = false
 	reg.Flag.H = false
-	reg.Flag.C = carry
+	reg.Flag.C = false
+
+	newVal := reg.C.val() << 1
+	if isMSBSet {
+		reg.Flag.C = true
+	}
+
+	if isCarrySet {
+		newVal = setBit(newVal, 0)
+	}
+
+	if newVal == 0 {
+		reg.Flag.Z = true
+	}
+	reg.C = byteRegister(newVal)
+
 	return cbInstr.actionDuration
 }
