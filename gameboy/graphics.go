@@ -104,27 +104,27 @@ func (graphics *graphics) drawCurrentLine() {
 		tileMapAddress = 0x1C00
 	}
 
-	// Adjust for the current line and the current place of the screen in the background
+	// Where is the screen relative to the background in memory?
 	var scY = uint16(graphics.memory.ioPorts[SCROLL_Y])
 	var scX = uint16(graphics.memory.ioPorts[SCROLL_X])
-	tileMapAddress += ((scY + uint16(graphics.line)) >> 3) << 5
 
-	// The offset in the current line of tiles according to the x-scroll
-	var lineOffset = scX >> 3
+	// We adjust the tilemap address. There are 32*32 tiles total in the background, and every tile has 8 lines.
+	tileMapAddress = tileMapAddress + (scY+uint16(graphics.line))*(32/8)
 
-	// The x and y values of the point in the background
-	var y = uint8(graphics.line + uint8(scY))
-	var x = uint8(scX)
+	// The offset in the current line of tiles according to the x-scroll, there are 8 pixels width in a tile
+	var offsetInLine = scX / 8
 
-	tileNumber := int16(graphics.memory.videoRam[tileMapAddress+lineOffset])
+	// The x and y values of the point in the tile
+	var y = (uint8(scY) + graphics.line) % 8
+	var x = uint8(scX) % 8
 
+	tileNumber := graphics.memory.videoRam[tileMapAddress+offsetInLine]
 	for i := 0; i < 160; i++ {
-		var dataAddr = uint16(tileNumber * 16)
+		var dataAddr = uint16(tileNumber)*16 + uint16(y*2)
 
-		lowerByte := graphics.memory.videoRam[dataAddr+uint16((y%8)*2)]
-		higherByte := graphics.memory.videoRam[dataAddr+uint16((y%8)*2)+1]
-
-		var colourNum = ((higherByte >> x & 0x1) << 1) | ((lowerByte >> x) & 0x1)
+		lowerByte := graphics.memory.videoRam[dataAddr]
+		higherByte := graphics.memory.videoRam[dataAddr+1]
+		var colourNum = ((getBitN(higherByte, uint(x))) << 1) | (getBitN(lowerByte, uint(x)))
 
 		colour := graphics.getColor(colourNum, 0xff47)
 
@@ -147,9 +147,8 @@ func (graphics *graphics) drawCurrentLine() {
 		x++
 		if x == 8 {
 			x = 0
-			lineOffset = (lineOffset + 1) & 31
-			var tileAddress = tileMapAddress + lineOffset
-			tileNumber = int16(graphics.memory.videoRam[tileAddress])
+			offsetInLine = offsetInLine + 1
+			tileNumber = graphics.memory.videoRam[tileMapAddress+offsetInLine]
 		}
 	}
 }

@@ -90,6 +90,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]*instruc
 	instr, ok := (*instrMap)[instructionCode]
 
 	if !ok {
+		spew.Dump(mem.videoRam)
 		panic(fmt.Sprintf("Unrecognized instruction %#02x at address %#04x", instructionCode, reg.PC.val()))
 	}
 
