@@ -288,14 +288,14 @@ func localization(code uint8) string {
 	}
 }
 
-func createCartridgeInfo(cartridge *[]byte) *cartridgeInfo {
+func createCartridgeInfo(cartridge []byte) *cartridgeInfo {
 	return &cartridgeInfo{
-		Name:         cartridgeTitle(*cartridge),
-		CartType:     typeCode((*cartridge)[0x147]),
-		System:       gameboyType((*cartridge)[0x146]),
-		romSize:      uint8ToromSizeCode((*cartridge)[0x148]),
-		ramSize:      uint8ToramSizeCode((*cartridge)[0x149]),
-		Localization: localization((*cartridge)[0x14A]),
+		Name:         cartridgeTitle(cartridge),
+		CartType:     typeCode(cartridge[0x147]),
+		System:       gameboyType(cartridge[0x146]),
+		romSize:      uint8ToromSizeCode(cartridge[0x148]),
+		ramSize:      uint8ToramSizeCode(cartridge[0x149]),
+		Localization: localization(cartridge[0x14A]),
 	}
 }
 

@@ -28,7 +28,7 @@ func main() {
 	}
 	defer window.Destroy()
 
-	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
+	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED | sdl.RENDERER_PRESENTVSYNC)
 
-	gameboy.Run(&cartridge, &bootrom, renderer)
+	gameboy.Run(cartridge, bootrom, renderer)
 }

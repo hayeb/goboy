@@ -48,9 +48,8 @@ func rl_c(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.Flag.C = false
 
 	newVal := reg.C.val() << 1
-	if isMSBSet {
-		reg.Flag.C = true
-	}
+
+	reg.Flag.C = isMSBSet
 
 	if isCarrySet {
 		newVal = setBit(newVal, 0)
