@@ -2,7 +2,6 @@ package gameboy
 
 import (
 	"github.com/veandco/go-sdl2/sdl"
-	"fmt"
 )
 
 const (
@@ -90,6 +89,7 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 			graphics.mode = 0
 
 			graphics.drawCurrentLine()
+			graphics.drawSprites()
 		}
 	}
 }
@@ -109,14 +109,14 @@ func (graphics *graphics) drawCurrentLine() {
 	var scX = uint16(graphics.memory.ioPorts[SCROLL_X])
 
 	// We adjust the tilemap address. There are 32*32 tiles total in the background, and every tile has 8 lines.
-	tileMapAddress = tileMapAddress + (scY+uint16(graphics.line))*(32/8)
-
-	// The offset in the current line of tiles according to the x-scroll, there are 8 pixels width in a tile
-	var offsetInLine = scX / 8
+	tileMapAddress = tileMapAddress + (scY+uint16(graphics.line))/8*32
 
 	// The x and y values of the point in the tile
 	var y = (uint8(scY) + graphics.line) % 8
 	var x = uint8(scX) % 8
+
+	// The offset in the current line of tiles according to the x-scroll, there are 8 pixels width in a tile
+	var offsetInLine = scX / 8
 
 	tileNumber := graphics.memory.videoRam[tileMapAddress+offsetInLine]
 	for i := 0; i < 160; i++ {
@@ -124,9 +124,13 @@ func (graphics *graphics) drawCurrentLine() {
 
 		lowerByte := graphics.memory.videoRam[dataAddr]
 		higherByte := graphics.memory.videoRam[dataAddr+1]
-		var colourNum = ((getBitN(higherByte, uint(x))) << 1) | (getBitN(lowerByte, uint(x)))
 
-		colour := graphics.getColor(colourNum, 0xff47)
+		lowerBit := lowerByte >> x & 0x1
+		higherBit := higherByte >> x & 0x1
+
+		colorByte := higherBit<<1 | lowerBit
+
+		colour := graphics.getColor(colorByte, 0xff47)
 
 		r, g, b := 0, 0, 0
 		switch colour {
@@ -168,105 +172,13 @@ func (graphics *graphics) isLCDEnabled() bool {
 }
 
 func (graphics *graphics) getColor(n uint8, a uint16) int {
-	p := graphics.memory.read8(a)
-	hi := uint8(0)
-	lo := uint8(0)
-
-	switch n {
-	case 0:
-		hi, lo = 1, 0
-	case 1:
-		hi, lo = 3, 2
-	case 2:
-		hi, lo = 5, 4
-	case 3:
-		hi, lo = 7, 6
+	// TODO: Properly handle palettes/colors
+	if n > 0 {
+		return 0
 	}
-
-	colour := getBitN(p, uint(hi))<<1 | getBitN(p, uint(lo))
-	switch colour {
-	case 0:
-		return WHITE
-	case 1:
-		return LIGHT_GRAY
-	case 2:
-		return DARK_GRAY
-	case 3:
-		return BLACK
-	default:
-		panic(fmt.Sprintf("Could not determine colour for value %#02x", colour))
-	}
+	return 1
 }
 
-func (graphics *graphics) renderSprites(lcdControl uint8) {
-	if !testBit(lcdControl, 1) {
-		return
-	}
+func (graphics *graphics) drawSprites() {
 
-	use8x16 := false
-
-	if testBit(lcdControl, 2) {
-		use8x16 = true
-	}
-
-	for sprite := 0; sprite < 40; sprite += 1 {
-		index := sprite * 4
-		yPos := graphics.memory.read8(0xfe00+uint16(index)) - 16
-		xPos := graphics.memory.read8(0xfe00+uint16(index)+1) - 8
-		tileLocation := graphics.memory.read8(0xfe00 + uint16(index) + 2)
-		attributes := graphics.memory.read8(0xfe00 + uint16(index) + 3)
-
-		yFlip := testBit(attributes, 6)
-		xFlip := testBit(attributes, 5)
-
-		scanLine := graphics.memory.read8(0xff44)
-
-		ysize := 8
-
-		if use8x16 {
-			ysize = 16
-		}
-
-		if scanLine >= yPos && scanLine < yPos+uint8(ysize) {
-			var line = int(scanLine - yPos)
-			if yFlip {
-				line = -1 * (line - ysize)
-			}
-			line = line * 2
-			d1 := graphics.memory.read8(0x8000 + uint16(int((tileLocation * 16))+line))
-			d2 := graphics.memory.read8(0x8000 + uint16(int((tileLocation * 16))+line+1))
-
-			for tilePixel := 7; tilePixel >= 0; tilePixel-- {
-				colourBit := tilePixel
-				if xFlip {
-					colourBit = -1 * (colourBit - 7)
-				}
-				var colourNum = ((d2 >> uint8(colourBit) & 0x1) << 1) | ((d1 >> uint8(colourBit)) & 0x1)
-				address := 0xff48
-				if testBit(attributes, 4) {
-					address = 0xff49
-				}
-
-				colour := graphics.getColor(colourNum, uint16(address))
-				if colour == WHITE {
-					continue
-				}
-				r, g, b := uint8(0), uint8(0), uint8(0)
-				switch colour {
-				case WHITE:
-					r, g, b = 255, 255, 255
-				case LIGHT_GRAY:
-					r, g, b = 0xcc, 0xcc, 0xcc
-				case DARK_GRAY:
-					r, g, b = 0x77, 0x77, 0x77
-				}
-
-				xPix := 0 - tilePixel + 7
-				pixel := int(xPos) + xPix
-
-				graphics.renderer.SetDrawColor(r, g, b, 255)
-				graphics.renderer.DrawPoint(int(scanLine), pixel)
-			}
-		}
-	}
 }

@@ -90,7 +90,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]*instruc
 	instr, ok := (*instrMap)[instructionCode]
 
 	if !ok {
-		spew.Dump(mem.videoRam)
+		//spew.Dump(mem.videoRam)
 		panic(fmt.Sprintf("Unrecognized instruction %#02x at address %#04x", instructionCode, reg.PC.val()))
 	}
 
@@ -122,8 +122,9 @@ func pushStack8(mem *memory, regs *register, val uint8) {
 }
 
 func pushStack16(mem *memory, reg *register, val uint16) {
-	pushStack8(mem, reg, mostSig16(val))
 	pushStack8(mem, reg, leastSig16(val))
+	pushStack8(mem, reg, mostSig16(val))
+
 }
 
 func popStack8(mem *memory, reg *register) uint8 {
@@ -132,8 +133,8 @@ func popStack8(mem *memory, reg *register) uint8 {
 }
 
 func popStack16(mem *memory, reg *register) uint16 {
-	least := popStack8(mem, reg)
 	most := popStack8(mem, reg)
+	least := popStack8(mem, reg)
 	val := uint16(most)<<8 | uint16(least)
 	return val
 }

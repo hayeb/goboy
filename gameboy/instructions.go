@@ -60,26 +60,33 @@ func createInstructionMap() *map[uint8]*instruction {
 		0x57: newInstruction("LD D,A", 1, 4, ldDA),
 		0x67: newInstruction("LD H,A", 1, 4, ldHA),
 		0x77: newInstruction("LD (HL),A", 1, 8, ldHLA),
-		0x78: newInstruction("LD A,B",1,4, ldAB),
+		0x78: newInstruction("LD A,B", 1, 4, ldAB),
 		0x7b: newInstruction("LD A,E", 1, 4, ldAE),
 		0x7c: newInstruction("LD A,H", 1, 4, ldAH),
 		0x7d: newInstruction("LD A,L", 1, 4, ldAL),
 		0x86: newInstruction("ADD A,(HL)", 1, 8, addAHL),
 		0x90: newInstruction("SUB B", 1, 4, subB),
+		0xa7: newInstruction("AND A", 1, 4, andA),
 		0xaf: newInstruction("XOR A", 1, 4, xorA),
 		0xb1: newInstruction("OR C", 1, 4, orC),
 		0xbe: newInstruction("CP (HL)", 1, 8, cpHL),
+		0xc0: newConditionalInstruction("RET NZ", 1, 20, 8, retNz),
 		0xc1: newInstruction("POP BC", 1, 12, popBc),
 		0xc3: newInstruction("JP a16", 0, 16, jpnn), // JP nn no length: interference with updating PC
 		0xc5: newInstruction("PUSH BC", 1, 16, pushBc),
 		0xc9: newInstruction("RET", 0, 16, ret), // RET no length: interference with updating PC
 		0xcb: newInstruction("CB", 1, 4, nil),
+		0xcc: newConditionalInstruction("CALL Z,a16", 3, 24, 12, callZa16),
 		0xcd: newInstruction("CALL a16", 0, 12, callNn), // CALL has no length, as it interferes with updating PC
+		0xd5: newInstruction("PUSH DE", 1, 16, pushDe),
 		0xe0: newInstruction("LDH a8,A", 2, 12, ldhA8A),
 		0xe2: newInstruction("LD (C),A", 1, 8, ldCA),
+		0xe5: newInstruction("PUSH HL", 1, 8, pushHl),
 		0xea: newInstruction("LD (a16),A", 3, 16, ldA16A),
 		0xf0: newInstruction("LDH A,(a8)", 2, 12, ldAA8),
 		0xf3: newInstruction("DI", 1, 4, di),
+		0xf5: newInstruction("PUSH AF", 1, 16, pushAf),
+		0xfb: newInstruction("EI", 1, 4, ei),
 		0xfe: newInstruction("CP d8", 2, 8, cpD8),
 	}
 }
@@ -119,7 +126,7 @@ func incRegister(br *byteRegister, reg *register) {
 func decRegister(br *byteRegister, reg *register) {
 	val := br.val()
 	*br = byteRegister(val - uint8(1))
-	reg.Flag.Z = val-1 == 0
+	reg.Flag.Z = *br == 0
 	reg.Flag.N = true
 	reg.Flag.H = *br < 0xf
 }
@@ -217,7 +224,7 @@ func lddHLA(mem *memory, reg *register, instr *instruction) int {
 
 func ldhA8A(mem *memory, reg *register, instr *instruction) int {
 	arg := readArgByte(mem, reg, 1)
-	mem.write8(0xff00+ uint16(arg), reg.A.val())
+	mem.write8(0xff00+uint16(arg), reg.A.val())
 	// Does not affect flags
 	return instr.durationAction
 }
@@ -240,26 +247,14 @@ func pushBc(mem *memory, reg *register, instr *instruction) int {
 }
 
 func rla(mem *memory, reg *register, instr *instruction) int {
-	isCarrySet := reg.Flag.C
-	isMSBSet := testBit(reg.A.val(), 7)
+	carry := reg.Flag.C
+	reg.Flag.C = (reg.A&0x80)>>7 == 1
 
-	reg.Flag.Z = false
-	reg.Flag.N = false
-	reg.Flag.H = false
-	reg.Flag.C = false
-
-	reg.A = byteRegister(reg.A.val() << 1)
-
-	if isMSBSet {
-		reg.Flag.C = true
+	reg.A = reg.A << 1
+	if carry {
+		reg.A = reg.A | 0x1
 	}
-	if isCarrySet {
-		reg.A = byteRegister(setBit(reg.A.val(), 0))
-	}
-
-	if reg.A.val() == 0 {
-		reg.Flag.Z = true
-	}
+	reg.Flag.Z = reg.A == 0
 	return instr.durationAction
 }
 
@@ -432,7 +427,7 @@ func ldAB(mem *memory, reg *register, instr *instruction) int {
 
 func addAHL(mem *memory, reg *register, instr *instruction) int {
 	a := reg.A.val()
-	value :=  mem.read8(reg.readDuo(reg_hl))
+	value := mem.read8(reg.readDuo(reg_hl))
 	reg.A = byteRegister(reg.A.val() + value)
 
 	reg.Flag.Z = reg.A.val() == 0
@@ -455,6 +450,10 @@ func jpnn(mem *memory, reg *register, instr *instruction) int {
 }
 
 func di(mem *memory, reg *register, instr *instruction) int {
+	return instr.durationAction
+}
+
+func ei(mem *memory, reg *register, instr *instruction) int {
 	return instr.durationAction
 }
 
@@ -493,4 +492,51 @@ func orC(mem *memory, reg *register, instr *instruction) int {
 	reg.Flag.H = false
 	reg.Flag.C = false
 	return instr.durationAction
+}
+
+func pushAf(mem *memory, reg *register, instr *instruction) int {
+	pushStack16(mem, reg, reg.readDuo(reg_af))
+	// Does not affect flags
+	return instr.durationAction
+}
+
+func pushDe(mem *memory, reg *register, instr *instruction) int {
+	pushStack16(mem, reg, reg.readDuo(reg_de))
+	// Does not affect flags
+	return instr.durationAction
+}
+
+func pushHl(mem *memory, reg *register, instr *instruction) int {
+	pushStack16(mem, reg, reg.readDuo(reg_hl))
+	// Does not affect flags
+	return instr.durationAction
+}
+
+func andA(mem *memory, reg *register, instr *instruction) int {
+	reg.A = byteRegister(reg.A.val() & reg.A.val())
+
+	reg.Flag.Z = reg.A == 0
+	reg.Flag.N = false
+	reg.Flag.H = true
+	reg.Flag.C = false
+	return instr.durationAction
+}
+
+func retNz(mem *memory, reg *register, instr *instruction) int {
+	if !reg.Flag.Z {
+		addr := popStack16(mem, reg)
+		reg.PC = halfWordRegister(addr)
+		return instr.durationAction
+	}
+	return instr.durationNoop
+}
+
+func callZa16(mem *memory, reg *register, instr *instruction) int {
+	if reg.Flag.Z {
+		pushStack16(mem, reg, reg.PC.val()+uint16(3))
+		addr := readArgHalfword(mem, reg, 1)
+		reg.PC = halfWordRegister(addr)
+		return instr.durationAction
+	}
+	return instr.durationNoop
 }

@@ -80,7 +80,7 @@ func (reg *register) incrDuo(duo duoRegister) {
 
 func (reg *register) writeDuo(duo duoRegister, val uint16) {
 	left := uint8(val >> 8)
-	right := uint8(val)
+	right := uint8(val & 0xff)
 	switch duo {
 	case reg_af:
 		reg.A = byteRegister(left)
