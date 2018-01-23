@@ -20,6 +20,10 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Renderer) {
 	for true {
 		oldPC := reg.PC.val()
 
+		if oldPC > 0x100 {
+			fmt.Println("oeps")
+		}
+
 		instrLength, name := executeInstruction(mem, reg, instrMap, cbInstrMap)
 
 		if interruptEnableScheduled {
@@ -95,13 +99,9 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]*instruc
 	}
 
 	if instr.name != "CB" {
-		if reg.PC.val() > 0x100 {
-			fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
-		}
+		//fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
 
 		cycles := instr.executor(mem, reg, instr)
-		reg.PC = halfWordRegister(reg.PC.val() + uint16(instr.bytes))
-
 		return cycles, instr.name
 	} else {
 		cbCode := mem.read8(reg.PC.val() + 1)
@@ -111,7 +111,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]*instruc
 		}
 		//fmt.Printf("%#04x\t%s %s\n", reg.PC.val(), instr.name, cb.name)
 		cycles := cb.executor(mem, reg, cb)
-		reg.PC = halfWordRegister(reg.PC.val() + uint16(cb.bytes))
+		reg.PC = halfWordRegister(reg.PC.val() + 1)
 		return cycles + 4, cb.name
 	}
 }

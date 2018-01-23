@@ -35,6 +35,8 @@ func newCBConditionalInstruction(name string, length int, actionDuration int, no
 
 func bit_7_h(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.bit(7, reg.H.val())
+
+	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
 
@@ -59,6 +61,6 @@ func rl_c(mem *memory, reg *register, cbInstr *cbInstruction) int {
 		reg.Flag.Z = true
 	}
 	reg.C = byteRegister(newVal)
-
+	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }

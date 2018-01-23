@@ -115,3 +115,12 @@ func (reg *register) incSP(n int) {
 func (reg *register) decSP(n int) {
 	reg.SP = halfWordRegister(reg.SP.val() - uint16(n))
 }
+
+func (reg *register) incPC(n int) {
+	reg.PC = halfWordRegister(reg.PC.val() + uint16(n))
+}
+
+func (reg *register) decPC(n int) {
+	reg.PC = halfWordRegister(reg.PC.val() - uint16(n))
+}
+
