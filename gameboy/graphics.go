@@ -108,14 +108,16 @@ func (graphics *graphics) drawCurrentLine() {
 	var scY = uint16(graphics.memory.ioPorts[SCROLL_Y])
 	var scX = uint16(graphics.memory.ioPorts[SCROLL_X])
 
-	// We adjust the tilemap address. There are 32*32 tiles total in the background, and every tile has 8 lines.
+	// We adjust the tilemap address. There are 32*32 tiles total in the background,
+	// and every tile has 8 lines.
 	tileMapAddress = tileMapAddress + (scY+uint16(graphics.line))/8*32
 
 	// The x and y values of the point in the tile
 	var y = (uint8(scY) + graphics.line) % 8
 	var x = uint8(scX) % 8
 
-	// The offset in the current line of tiles according to the x-scroll, there are 8 pixels width in a tile
+	// The offset in the current line of tiles according to the x-scroll,
+	// there are 8 pixels width in a tile
 	var offsetInLine = scX / 8
 
 	tileNumber := graphics.memory.videoRam[tileMapAddress+offsetInLine]
@@ -125,8 +127,10 @@ func (graphics *graphics) drawCurrentLine() {
 		lowerByte := graphics.memory.videoRam[dataAddr]
 		higherByte := graphics.memory.videoRam[dataAddr+1]
 
-		lowerBit := lowerByte >> x & 0x1
-		higherBit := higherByte >> x & 0x1
+		// The tile are layn out in memory as you would expect, so
+		// the 7th bit in a line is the left-most pixel
+		lowerBit := lowerByte >> (7 - x) & 0x1
+		higherBit := higherByte >> (7 - x) & 0x1
 
 		colorByte := higherBit<<1 | lowerBit
 

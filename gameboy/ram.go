@@ -30,6 +30,8 @@ type memorySettings struct {
 
 	currentROMBank int
 	currentRAMBank int
+
+	dma_pending_time int
 }
 
 const (
@@ -83,6 +85,7 @@ func memInit(bootrom []uint8, cartridge []uint8) *memory {
 		interruptEnableRegister: 0,
 		memorySettings: memorySettings{
 			romBanking: true,
+			dma_pending_time: 0,
 		},
 	}
 }
@@ -129,6 +132,8 @@ func (memory *memory) read8(address uint16) uint8 {
 		return memory.switchableRamBank[address-0xA000+uint16(memory.memorySettings.currentRAMBank*0x2000)]
 	case internalRam8kb:
 		return memory.internalRam8kb[address - 0xC000]
+	case echoInternalRam8kb:
+		return memory.echoInternalRam[address - 0xE000]
 	case ioPorts:
 		return memory.ioPorts[address-0xff00]
 	case internalRam:
@@ -173,6 +178,7 @@ func (memory *memory) write8(address uint16, val uint8) {
 		memory.internalRam8kb[address-0xc000] = val
 	case echoInternalRam8kb:
 		memory.internalRam8kb[address-0x2000-0xc000] = val
+	// TODO: Not accessible while display is updating
 	case spriteAttribMemory:
 		memory.spriteAttribMemory[address-0xfe00] = val
 	case empty1:
@@ -196,7 +202,10 @@ func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 		fmt.Println("Resetting scanline register 0xff44 to 0")
 		return true
 	} else if address == 0xff46 {
-		panic(fmt.Sprintf("Initiating DMA transfer, address %#04x", val))
+		fmt.Printf("DMA transfer from %#04x", val)
+		for i := 0; i < 0xA0; i++ {
+			memory.spriteAttribMemory[i] = memory.read8(uint16(val) + uint16(i))
+		}
 	}
 	return false
 }

@@ -20,7 +20,7 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Renderer) {
 	for true {
 		oldPC := reg.PC.val()
 
-		if oldPC > 0x100 {
+		if oldPC == 0x2c7 {
 			fmt.Println("oeps")
 		}
 
@@ -38,6 +38,8 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Renderer) {
 			interruptDisableScheduled = true
 		} else if name == "EI" {
 			interruptEnableScheduled = true
+		} else if name == "RETI" {
+			interruptMaster = true
 		}
 
 		graphics.updateGraphics(instrLength)
@@ -102,16 +104,18 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]*instruc
 		//fmt.Printf("%#04x\t%s\n", reg.PC.val(), instr.name)
 
 		cycles := instr.executor(mem, reg, instr)
+
+		//fmt.Println(regdump(reg))
 		return cycles, instr.name
 	} else {
 		cbCode := mem.read8(reg.PC.val() + 1)
 		cb, ok := (*cbInstrMap)[cbCode]
 		if !ok {
-			panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, reg.PC.val()+1))
+			panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, reg.PC.val()))
 		}
 		//fmt.Printf("%#04x\t%s %s\n", reg.PC.val(), instr.name, cb.name)
 		cycles := cb.executor(mem, reg, cb)
-		reg.PC = halfWordRegister(reg.PC.val() + 1)
+		reg.PC = halfWordRegister(reg.PC.val())
 		return cycles + 4, cb.name
 	}
 }
@@ -157,4 +161,8 @@ func initializeSystem(cart []uint8, bootrom []uint8, ren *sdl.Renderer) (*cartri
 	graphics := createGraphics(mem, ren, cartridgeInfo)
 	registers := new(register)
 	return cartridgeInfo, mem, registers, instructionMap, cbInstrucionMap, graphics
+}
+
+func regdump(reg *register) string {
+	return fmt.Sprintf("A: %#02x\tB: %#02x\tC: %#02x\tD: %#02x\tE: %#02x\tF: %#02x\nAF: %#04x\tBC: %#04x\tDE: %#04x\tHL: %#04x", reg.A.val(), reg.B.val(), reg.C.val(), reg.D.val(), reg.E.val(), reg.F.val(), reg.readDuo(reg_af), reg.readDuo(reg_bc), reg.readDuo(reg_de), reg.readDuo(reg_hl))
 }
