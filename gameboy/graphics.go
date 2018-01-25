@@ -1,15 +1,11 @@
 package gameboy
 
 import (
-	"github.com/veandco/go-sdl2/sdl"
+	"github.com/banthar/Go-SDL/sdl"
+	"fmt"
 )
 
 const (
-	WHITE      = 1
-	LIGHT_GRAY = 2
-	DARK_GRAY  = 3
-	BLACK      = 4
-
 	ADDRESS_IO_PORTS  = 0xFF00
 	ADDRESS_VIDEO_RAM = 0x8000
 
@@ -22,7 +18,7 @@ const (
 
 type graphics struct {
 	memory        *memory
-	renderer      *sdl.Renderer
+	renderer      *sdl.Surface
 	cartridgeInfo *cartridgeInfo
 
 	screen [144][160]drawColor
@@ -33,12 +29,12 @@ type graphics struct {
 }
 
 type drawColor struct {
-	r int
-	g int
-	b int
+	r uint8
+	g uint8
+	b uint8
 }
 
-func createGraphics(mem *memory, rend *sdl.Renderer, ci *cartridgeInfo) *graphics {
+func createGraphics(mem *memory, rend *sdl.Surface, ci *cartridgeInfo) *graphics {
 	return &graphics{
 		memory:        mem,
 		renderer:      rend,
@@ -90,7 +86,6 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 			graphics.mode = 0
 
 			graphics.drawCurrentLine()
-			graphics.drawSprites()
 		}
 	}
 }
@@ -99,6 +94,93 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 Draws current line to the screen buffer
  */
 func (graphics *graphics) drawCurrentLine() {
+	lcdc := graphics.memory.read8(0xFF40)
+	if !testBit(lcdc, 7) {
+		return
+	}
+
+	if testBit(lcdc, 0) {
+		graphics.drawBackground()
+	}
+
+	if testBit(lcdc, 1) {
+		graphics.drawSprites()
+	}
+}
+
+func (graphics *graphics) drawSprites() {
+	var mem = graphics.memory
+
+	bytesInSprite := uint8(16)
+	if testBit(mem.read8(0xFF00), 2) {
+		fmt.Println("8*16 sprites")
+		bytesInSprite = 32
+	}
+	for i := 0; i < 40; i++ {
+		address := i * 4
+
+		// Y top left on screen
+		y := mem.spriteAttribMemory[address] - 16
+		// X top left on screen
+		x := mem.spriteAttribMemory[address+1] - 8
+
+		// Should we draw a line in the current sprite?
+		if y > graphics.line || graphics.line >= y+8 {
+			continue
+		}
+
+		// Tile number
+		tileNumber := mem.spriteAttribMemory[address+2]
+
+		// Several options for this sprite
+		spriteFlags := mem.spriteAttribMemory[address+3]
+
+		rowAddress := tileNumber * bytesInSprite
+		if testBit(spriteFlags, 6) {
+			rowAddress += (bytesInSprite/2 - 1) - (graphics.line - y)
+		} else {
+			rowAddress += graphics.line - y
+		}
+
+		for j := uint8(0); j < 8; j++ {
+			if x+j < 0 || x+j > 160 {
+				continue
+			}
+
+			lowerByte := mem.videoRam[rowAddress]
+			higherByte := mem.videoRam[rowAddress+1]
+
+			var rowShift = 7 - j
+			if testBit(spriteFlags, 5) {
+				rowShift = j
+			}
+
+			lowerBit := (lowerByte >> rowShift) & 0x1
+			higherBit := (higherByte >> rowShift) & 0x1
+
+			colorByte := higherBit<<1 | lowerBit
+
+			paletteAddress := uint16(0xFF48)
+			if testBit(spriteFlags, 4) {
+				paletteAddress++
+			}
+
+			priority := testBit(spriteFlags, 7)
+			color := graphics.getColor(colorByte, paletteAddress)
+			backgroundColor := graphics.getColor(0, 0xFF47)
+			hidden := backgroundColor.r == color.r && backgroundColor.g == color.g && backgroundColor.b == color.b
+
+			if !(priority && hidden) {
+				continue
+			}
+			graphics.screen[graphics.line][x+j] = color
+		}
+	}
+}
+
+func (graphics *graphics) drawBackground() {
+
+	// TODO: Draw window
 	var tileMapAddress uint16 = 0x1800
 
 	if testBit(graphics.memory.ioPorts[LCDC], 3) {
@@ -128,30 +210,14 @@ func (graphics *graphics) drawCurrentLine() {
 		lowerByte := graphics.memory.videoRam[dataAddr]
 		higherByte := graphics.memory.videoRam[dataAddr+1]
 
-		// The tile are layn out in memory as you would expect, so
+		// The tile are lain out in memory as you would expect, so
 		// the 7th bit in a line is the left-most pixel
 		lowerBit := lowerByte >> (7 - x) & 0x1
 		higherBit := higherByte >> (7 - x) & 0x1
 
 		colorByte := higherBit<<1 | lowerBit
 
-		colour := graphics.getColor(colorByte, 0xff47)
-
-		r, g, b := 0, 0, 0
-		switch colour {
-		case WHITE:
-			r, g, b = 255, 255, 255
-		case LIGHT_GRAY:
-			r, g, b = 0xcc, 0xcc, 0xcc
-		case DARK_GRAY:
-			r, g, b = 0x77, 0x77, 0x77
-		}
-
-		graphics.screen[graphics.line][i] = drawColor{
-			r: r,
-			g: g,
-			b: b,
-		}
+		graphics.screen[graphics.line][i] = graphics.getColor(colorByte, 0xff47)
 
 		x++
 		if x == 8 {
@@ -165,26 +231,32 @@ func (graphics *graphics) drawCurrentLine() {
 func (graphics *graphics) showData() {
 	for j := 0; j < len(graphics.screen); j++ {
 		for i := 0; i < len(graphics.screen[0]); i++ {
-			graphics.renderer.SetDrawColor(uint8(graphics.screen[j][i].r), uint8(graphics.screen[j][i].g), uint8(graphics.screen[j][i].b), 255)
-			rect := sdl.Rect{X: int32(i * 4), Y: int32(j * 4), W: 4, H: 4}
-			graphics.renderer.FillRect(&rect)
+			rect := sdl.Rect{X: int16(i * 4), Y: int16(j * 4), W: 4, H: 4}
+			graphics.renderer.FillRect(&rect, sdl.MapRGBA(graphics.renderer.Format, graphics.screen[j][i].r, graphics.screen[j][i].g, graphics.screen[j][i].b, 0xff))
 		}
 	}
-	graphics.renderer.Present()
+	graphics.renderer.Flip()
 }
 
 func (graphics *graphics) isLCDEnabled() bool {
 	return testBit(graphics.memory.read8(0xff40), 7)
 }
 
-func (graphics *graphics) getColor(n uint8, a uint16) int {
-	// TODO: Properly handle palettes/colors
-	if n > 0 {
-		return 0
+func (graphics *graphics) getColor(colorByte uint8, paletteAddress uint16) drawColor {
+	palette := graphics.memory.read8(paletteAddress)
+
+	colorNo := (palette >> (colorByte * 2)) & 0x3
+
+	switch colorNo {
+	case 0:
+		return drawColor{255, 255, 255}
+	case 1:
+		return drawColor{0xcc, 0xcc, 0xcc}
+	case 2:
+		return drawColor{0x77, 0x77, 0x77}
+	case 3:
+		return drawColor{0, 0, 0}
+	default:
+		panic("Unknown color!")
 	}
-	return 1
-}
-
-func (graphics *graphics) drawSprites() {
-
 }

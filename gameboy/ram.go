@@ -189,16 +189,25 @@ func (memory *memory) write8(address uint16, val uint8) {
 }
 
 func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
-	if address == 0xff44 {
+	switch address {
+	case 0xFF44:
 		// Reset the scanline to 0
 		fmt.Println("Resetting scanline register 0xff44 to 0")
 		return true
-	} else if address == 0xff46 {
-		fmt.Printf("DMA transfer from %#04x\n", val)
+	case 0xFF46:
 		for i := 0; i < 0xA0; i++ {
 			memory.spriteAttribMemory[i] = memory.read8(uint16(val) + uint16(i))
 		}
 		return true
+	case 0xFF04:
+		fmt.Println("Reset divider to 0")
+	case 0xFF05:
+		fmt.Println("Writing to counter")
+	case 0xFF06:
+		fmt.Println("Writing to modulo")
+	case 0xFF07:
+		fmt.Println("Writing to timer control")
+
 	}
 	return false
 }

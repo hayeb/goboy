@@ -3,13 +3,29 @@ package gameboy
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/veandco/go-sdl2/sdl"
+	"github.com/banthar/Go-SDL/sdl"
 )
 
 var _ = spew.Config
 
-func Run(cart []uint8, bootrom []uint8, renderer *sdl.Renderer) {
+type input struct {
+	A     bool
+	B     bool
+	LEFT  bool
+	RIGHT bool
+	UP    bool
+	DOWN  bool
+	ENTER bool
+	SPACE bool
+}
+
+type timer struct {
+	time int
+}
+
+func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 	ci, mem, reg, instrMap, cbInstrMap, graphics := initializeSystem(cart, bootrom, renderer)
+	input := input{}
 
 	if ci.ramSize != ram_none || ci.romSize != rom_kbit_256 {
 		panic("Cartridge not supported")
@@ -32,20 +48,19 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Renderer) {
 
 		if name == "DI" {
 			interruptDisableScheduled = true
-			fmt.Println("Schedule disable interrupts")
 		} else if name == "EI" {
 			interruptEnableScheduled = true
-			fmt.Println("Schedule enable interrupts")
 		} else if name == "RETI" {
-			fmt.Println("Enable interrupts")
 			interruptMaster = true
 		}
 
+		// TODO: Update timers
+		// This is the reason that the license screen is only displayed a short time.
+		//updateTimer(instrLength)
 		graphics.updateGraphics(instrLength)
 		handleInterupts(mem, reg, interruptMaster)
-		// TODO: Update timers
 
-		handleInput(mem)
+		handleInput(&input, mem)
 
 		// Swap out the boot rom
 		if oldPC == 0xfe {
@@ -54,58 +69,129 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Renderer) {
 	}
 }
 
-func handleInput(mem *memory) {
-	var joypadreg = mem.read8(0xFF00)
-	var state = sdl.GetKeyboardState()
-
-	if testBit(joypadreg, 5) {
-		if state[sdl.SCANCODE_RIGHT] != 0 {
-			joypadreg = setBit(joypadreg, 0)
-		} else {
-			joypadreg = resetBit(joypadreg, 0)
+func handleInput(input *input, mem *memory) {
+	for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+		switch t := event.(type) {
+		case *sdl.KeyboardEvent:
+			switch t.Keysym.Sym {
+			case sdl.K_a:
+				if t.Type == sdl.KEYDOWN {
+					input.A = true
+				} else {
+					input.A = false
+				}
+			case sdl.K_b:
+				if t.Type == sdl.KEYDOWN {
+					input.B = true
+				} else {
+					input.B = false
+				}
+			case sdl.K_LEFT:
+				if t.Type == sdl.KEYDOWN {
+					input.LEFT = true
+				} else {
+					input.LEFT = false
+				}
+			case sdl.K_RIGHT:
+				if t.Type == sdl.KEYDOWN {
+					input.RIGHT = true
+				} else {
+					input.RIGHT = false
+				}
+			case sdl.K_UP:
+				if t.Type == sdl.KEYDOWN {
+					input.UP = true
+				} else {
+					input.UP = false
+				}
+			case sdl.K_DOWN:
+				if t.Type == sdl.KEYDOWN {
+					input.DOWN = true
+				} else {
+					input.DOWN = false
+				}
+			case sdl.K_RETURN:
+				if t.Type == sdl.KEYDOWN {
+					input.ENTER = true
+				} else {
+					input.ENTER = false
+				}
+			case sdl.K_SPACE:
+				if t.Type == sdl.KEYDOWN {
+					input.SPACE = true
+				} else {
+					input.SPACE = false
+				}
+			}
 		}
-		if state[sdl.SCANCODE_LEFT] != 0 {
-			joypadreg = setBit(joypadreg, 1)
-		} else {
-			joypadreg = resetBit(joypadreg, 1)
-		}
-		if state[sdl.SCANCODE_UP] != 0 {
-			joypadreg = setBit(joypadreg, 2)
-		} else {
-			joypadreg = resetBit(joypadreg, 2)
-		}
-		if state[sdl.SCANCODE_DOWN] != 0 {
-			joypadreg = setBit(joypadreg, 3)
-		} else {
-			joypadreg = resetBit(joypadreg, 3)
-		}
-
-		joypadreg = resetBit(joypadreg, 5)
-	} else if testBit(joypadreg, 4) {
-		if state[sdl.SCANCODE_A] != 0 {
-			joypadreg = setBit(joypadreg, 0)
-		} else {
-			joypadreg = resetBit(joypadreg, 0)
-		}
-		if state[sdl.SCANCODE_B] != 0 {
-			joypadreg = setBit(joypadreg, 1)
-		} else {
-			joypadreg = resetBit(joypadreg, 1)
-		}
-		if state[sdl.SCANCODE_SPACE] != 0 {
-			joypadreg = setBit(joypadreg, 2)
-		} else {
-			joypadreg = resetBit(joypadreg, 2)
-		}
-		if state[sdl.SCANCODE_RETURN] != 0 {
-			joypadreg = setBit(joypadreg, 3)
-		} else {
-			joypadreg = resetBit(joypadreg, 3)
-		}
-		joypadreg = resetBit(joypadreg, 4)
 	}
 
-	mem.write8(0xFF00, joypadreg)
+	updateJoyReg(input, mem)
+}
+
+func updateTimer(timer *timer, length int) {
+
+}
+
+func updateJoyReg(input *input, mem *memory) {
+	joyPadReg := mem.read8(0xFF00)
+	if !testBit(joyPadReg, 4) && !testBit(joyPadReg, 5) {
+		// Do nothing when input is not polled
+		return
+	} else if testBit(joyPadReg, 4) && testBit(joyPadReg, 5) {
+		// Reset the register
+		mem.write8(0xFF00, 0)
+		return
+	}
+
+	if testBit(joyPadReg, 4) {
+		if input.ENTER {
+			joyPadReg = resetBit(joyPadReg, 3)
+		} else {
+			joyPadReg = setBit(joyPadReg, 3)
+		}
+		if input.SPACE {
+			joyPadReg = resetBit(joyPadReg, 2)
+		} else {
+			joyPadReg = setBit(joyPadReg, 2)
+		}
+		if input.B {
+			joyPadReg = resetBit(joyPadReg, 1)
+		} else {
+			joyPadReg = setBit(joyPadReg, 1)
+		}
+		if input.A {
+			joyPadReg = resetBit(joyPadReg, 0)
+		} else {
+			joyPadReg = setBit(joyPadReg, 0)
+		}
+	} else if testBit(joyPadReg, 5) {
+		if input.DOWN {
+			joyPadReg = resetBit(joyPadReg, 3)
+		} else {
+			joyPadReg = setBit(joyPadReg, 3)
+		}
+		if input.UP {
+			joyPadReg = resetBit(joyPadReg, 2)
+		} else {
+			joyPadReg = setBit(joyPadReg, 2)
+		}
+		if input.LEFT {
+			joyPadReg = resetBit(joyPadReg, 1)
+		} else {
+			joyPadReg = setBit(joyPadReg, 1)
+		}
+		if input.RIGHT {
+			joyPadReg = resetBit(joyPadReg, 0)
+		} else {
+			joyPadReg = setBit(joyPadReg, 1)
+		}
+	}
+
+	joyPadReg = resetBit(joyPadReg, 4)
+	joyPadReg = resetBit(joyPadReg, 5)
+
+	mem.write8(0xFF00, joyPadReg)
 }
 
 func handleInterupts(mem *memory, reg *register, master bool) {
@@ -129,7 +215,6 @@ func serviceInterupt(mem *memory, reg *register, i int, requested uint8) {
 
 	switch i {
 	case 0:
-		fmt.Println("Servicing V-BLANK interrupt")
 		reg.PC = 0x40
 	case 1:
 		fmt.Println("Servicing LCD interrupt")
@@ -168,7 +253,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]*instruc
 		if !ok {
 			panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, reg.PC))
 		}
-		//fmt.Printf("%#04x\t%s %s\n", reg.PC.val(), instr.name, cb.name)
+		//fmt.Printf("%#04x\t%s %s\n", reg.PC, instr.name, cb.name)
 		cycles := cb.executor(mem, reg, cb)
 		return cycles + 4, cb.name
 	}
@@ -207,7 +292,7 @@ func readArgHalfword(mem *memory, reg *register, offset int) uint16 {
 	return mem.read16(reg.PC + uint16(offset))
 }
 
-func initializeSystem(cart []uint8, bootrom []uint8, ren *sdl.Renderer) (*cartridgeInfo, *memory, *register, *map[uint8]*instruction, *map[uint8]*cbInstruction, *graphics) {
+func initializeSystem(cart []uint8, bootrom []uint8, ren *sdl.Surface) (*cartridgeInfo, *memory, *register, *map[uint8]*instruction, *map[uint8]*cbInstruction, *graphics) {
 	cartridgeInfo := createCartridgeInfo(cart)
 	instructionMap := createInstructionMap()
 	cbInstrucionMap := createCBInstructionMap()

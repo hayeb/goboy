@@ -55,6 +55,7 @@ func createInstructionMap() *map[uint8]*instruction {
 		0x28: newConditionalInstruction("JR Z,r8", 2, 12, 8, jrZR8),
 		0x2a: newInstruction("LD A,(HL+)", 1, 8, ldAHLP),
 		0x2c: newInstruction("INC L", 1, 8, incL),
+		0x2d: newInstruction("DEC L", 1, 4, decL),
 		0x2e: newInstruction("LD L,d8", 2, 8, ldLD8),
 		0x2f: newInstruction("CPL", 1, 4, cpl),
 		0x31: newInstruction("LD SP", 3, 12, ldSp),
@@ -65,10 +66,12 @@ func createInstructionMap() *map[uint8]*instruction {
 		0x3c: newInstruction("INC A", 1, 4, incA),
 		0x3d: newInstruction("DEC A", 1, 4, decA),
 		0x3e: newInstruction("LD A", 2, 8, ldA),
+		0x40: newInstruction("LD B,B", 1, 4, ldBB),
 		0x46: newInstruction("LD B,(HL)", 1, 8, ldBHL),
 		0x47: newInstruction("LD B,A", 1, 4, ldBA),
 		0x4f: newInstruction("LD C,A", 1, 4, ldcA),
 		0x4e: newInstruction("LD C,(HL)", 1, 8, ldCHL),
+		0x50: newInstruction("LD D,B", 1, 4, ldDB),
 		0x56: newInstruction("LD D,(HL)", 1, 8, ldDHL),
 		0x57: newInstruction("LD D,A", 1, 4, ldDA),
 		0x5e: newInstruction("LD E,(HL)", 1, 8, ldEHL),
@@ -410,6 +413,12 @@ func decA(mem *memory, reg *register, instr *instruction) int {
 	return instr.durationAction
 }
 
+func decL(mem *memory, reg *register, instr *instruction) int {
+	decRegister(&reg.L, reg)
+	reg.incPC(instr.bytes)
+	return instr.durationAction
+}
+
 func jrZR8(mem *memory, reg *register, instr *instruction) int {
 	arg := int8(readArgByte(mem, reg, 1))
 	reg.incPC(instr.bytes)
@@ -452,6 +461,13 @@ func ldDA(mem *memory, reg *register, instr *instruction) int {
 	reg.incPC(instr.bytes)
 	return instr.durationAction
 }
+
+func ldDB(mem *memory, reg *register, instr *instruction) int {
+	reg.D = reg.B
+	reg.incPC(instr.bytes)
+	return instr.durationAction
+}
+
 
 func ldEA(mem *memory, reg *register, instr *instruction) int {
 	reg.E = reg.A
@@ -781,6 +797,11 @@ func andd8(mem *memory, reg *register, instr *instruction) int {
 
 func ldBA(mem *memory, reg *register, instr *instruction) int {
 	reg.B = reg.A
+	reg.incPC(instr.bytes)
+	return instr.durationAction
+}
+
+func ldBB(mem *memory, reg *register, instr *instruction) int {
 	reg.incPC(instr.bytes)
 	return instr.durationAction
 }

@@ -17,6 +17,10 @@ func createCBInstructionMap() *map[uint8]*cbInstruction {
 		0x11: newCBInstruction("RL C", 2, 8, rl_c),
 		0x27: newCBInstruction("SLA A", 2, 8, slaA),
 		0x37: newCBInstruction("SWAP A", 2, 8, swapA),
+		0x50: newCBInstruction("BIT 2,B", 2, 8, bit_2_b),
+		0x58: newCBInstruction("BIT 3,B", 2, 8, bit_3_b),
+		0x60: newCBInstruction("BIT 4,B", 2, 8, bit_4_b),
+		0x68: newCBInstruction("BIT 5,B", 2, 8, bit_5_b),
 		0x7c: newCBInstruction("BIT 7,H", 2, 8, bit_7_h),
 		0x87: newCBInstruction("RES 0, a", 2, 8, res0A),
 
@@ -39,6 +43,34 @@ func newCBConditionalInstruction(name string, length int, actionDuration int, no
 
 func bit_7_h(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.bit(7, reg.H)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func bit_2_b(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(2, reg.B)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func bit_3_b(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(3, reg.B)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func bit_4_b(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(4, reg.B)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func bit_5_b(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(5, reg.B)
 
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
