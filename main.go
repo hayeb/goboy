@@ -22,13 +22,17 @@ func main() {
 	sdl.Init(sdl.INIT_EVERYTHING)
 
 	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		160, 144, sdl.WINDOW_SHOWN)
+		4 * 160, 4 * 144, sdl.WINDOW_SHOWN)
+
+	mode := sdl.DisplayMode{}
+	window.GetDisplayMode(&mode)
+	mode.RefreshRate = 60
+	window.SetDisplayMode(&mode)
 	if err != nil {
 		panic(err)
 	}
 	defer window.Destroy()
 
 	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED | sdl.RENDERER_PRESENTVSYNC)
-
 	gameboy.Run(cartridge, bootrom, renderer)
 }

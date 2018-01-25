@@ -63,6 +63,7 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 			if graphics.line == 143 {
 				graphics.mode = 1
 				graphics.showData()
+				graphics.memory.write8(0xff0f, setBit(graphics.memory.read8(0xff0f), 0))
 			} else {
 				graphics.mode = 2
 			}
@@ -165,7 +166,8 @@ func (graphics *graphics) showData() {
 	for j := 0; j < len(graphics.screen); j++ {
 		for i := 0; i < len(graphics.screen[0]); i++ {
 			graphics.renderer.SetDrawColor(uint8(graphics.screen[j][i].r), uint8(graphics.screen[j][i].g), uint8(graphics.screen[j][i].b), 255)
-			graphics.renderer.DrawPoint(i, j)
+			rect := sdl.Rect{X: int32(i * 4), Y: int32(j * 4), W: 4, H: 4}
+			graphics.renderer.FillRect(&rect)
 		}
 	}
 	graphics.renderer.Present()

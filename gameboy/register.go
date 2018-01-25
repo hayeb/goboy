@@ -2,8 +2,6 @@ package gameboy
 
 import "fmt"
 
-type byteRegister uint8
-type halfWordRegister uint16
 type flags struct {
 	Z bool
 	N bool
@@ -11,26 +9,18 @@ type flags struct {
 	C bool
 }
 
-func (bytereg byteRegister) val() uint8 {
-	return uint8(bytereg)
-}
-
-func (hwreg halfWordRegister) val() uint16 {
-	return uint16(hwreg)
-}
-
 type register struct {
-	A byteRegister
-	B byteRegister
-	C byteRegister
-	D byteRegister
-	E byteRegister
-	F byteRegister
-	H byteRegister
-	L byteRegister
+	A uint8
+	B uint8
+	C uint8
+	D uint8
+	E uint8
+	F uint8
+	H uint8
+	L uint8
 
-	SP halfWordRegister
-	PC halfWordRegister
+	SP uint16
+	PC uint16
 
 	Flag flags
 }
@@ -38,34 +28,34 @@ type register struct {
 type duoRegister int
 
 const (
-	reg_af duoRegister = iota
-	reg_bc
-	reg_de
-	reg_hl
+	REG_AF duoRegister = iota
+	REG_BC
+	REG_DE
+	REG_HL
 )
 
-func (reg *register) duoRegs(duo duoRegister) (byteRegister, byteRegister) {
+func (reg *register) duoRegs(duo duoRegister) (uint8, uint8) {
 	switch duo {
-	case reg_af:
+	case REG_AF:
 		return reg.A, reg.F
-	case reg_bc:
+	case REG_BC:
 		return reg.B, reg.C
-	case reg_de:
+	case REG_DE:
 		return reg.D, reg.E
-	case reg_hl:
+	case REG_HL:
 		return reg.H, reg.L
 	default:
 		panic(fmt.Sprintf("Unknown duo register %d", duo))
 	}
 }
 
-func duoRegisterValue(left byteRegister, right byteRegister) uint16 {
-	return uint16(left.val())<<8 | uint16(right.val())
+func duoRegisterValue(left uint8, right uint8) uint16 {
+	return uint16(left)<<8 | uint16(right)
 }
 
 func (reg *register) readDuo(duo duoRegister) uint16 {
 	l, r := reg.duoRegs(duo)
-	return uint16(l.val())<<8 | uint16(r.val())
+	return uint16(l)<<8 | uint16(r)
 }
 
 func (reg *register) decrDuo(duo duoRegister) {
@@ -82,18 +72,18 @@ func (reg *register) writeDuo(duo duoRegister, val uint16) {
 	left := uint8(val >> 8)
 	right := uint8(val & 0xff)
 	switch duo {
-	case reg_af:
-		reg.A = byteRegister(left)
-		reg.F = byteRegister(right)
-	case reg_bc:
-		reg.B = byteRegister(left)
-		reg.C = byteRegister(right)
-	case reg_de:
-		reg.D = byteRegister(left)
-		reg.E = byteRegister(right)
-	case reg_hl:
-		reg.H = byteRegister(left)
-		reg.L = byteRegister(right)
+	case REG_AF:
+		reg.A = left
+		reg.F = right
+	case REG_BC:
+		reg.B = left
+		reg.C = right
+	case REG_DE:
+		reg.D = left
+		reg.E = right
+	case REG_HL:
+		reg.H = left
+		reg.L = right
 	}
 }
 
@@ -109,18 +99,18 @@ func (reg *register) bit(bit int, val uint8) {
 }
 
 func (reg *register) incSP(n int) {
-	reg.SP = halfWordRegister(reg.SP.val() + uint16(n))
+	reg.SP = reg.SP+ uint16(n)
 }
 
 func (reg *register) decSP(n int) {
-	reg.SP = halfWordRegister(reg.SP.val() - uint16(n))
+	reg.SP = reg.SP - uint16(n)
 }
 
 func (reg *register) incPC(n int) {
-	reg.PC = halfWordRegister(reg.PC.val() + uint16(n))
+	reg.PC = reg.PC + uint16(n)
 }
 
 func (reg *register) decPC(n int) {
-	reg.PC = halfWordRegister(reg.PC.val() - uint16(n))
+	reg.PC =reg.PC - uint16(n)
 }
 

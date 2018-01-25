@@ -15,6 +15,7 @@ type cbInstructionExecutor func(mem *memory, reg *register, cbInstr *cbInstructi
 func createCBInstructionMap() *map[uint8]*cbInstruction {
 	return &map[uint8]*cbInstruction{
 		0x11: newCBInstruction("RL C", 2, 8, rl_c),
+		0x27: newCBInstruction("SLA A", 2, 8, slaA),
 		0x37: newCBInstruction("SWAP A", 2, 8, swapA),
 		0x7c: newCBInstruction("BIT 7,H", 2, 8, bit_7_h),
 		0x87: newCBInstruction("RES 0, a", 2, 8, res0A),
@@ -37,7 +38,7 @@ func newCBConditionalInstruction(name string, length int, actionDuration int, no
 }
 
 func bit_7_h(_ *memory, reg *register, cbInstr *cbInstruction) int {
-	reg.bit(7, reg.H.val())
+	reg.bit(7, reg.H)
 
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
@@ -45,14 +46,14 @@ func bit_7_h(_ *memory, reg *register, cbInstr *cbInstruction) int {
 
 func rl_c(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	isCarrySet := reg.Flag.C
-	isMSBSet := testBit(reg.C.val(), 7)
+	isMSBSet := testBit(reg.C, 7)
 
 	reg.Flag.Z = false
 	reg.Flag.N = false
 	reg.Flag.H = false
 	reg.Flag.C = false
 
-	newVal := reg.C.val() << 1
+	newVal := reg.C << 1
 
 	reg.Flag.C = isMSBSet
 
@@ -63,25 +64,36 @@ func rl_c(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	if newVal == 0 {
 		reg.Flag.Z = true
 	}
-	reg.C = byteRegister(newVal)
+	reg.C = newVal
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
 
 func res0A(mem *memory, reg *register, cbInstr *cbInstruction) int {
-	reg.A = byteRegister(resetBit(reg.A.val(), 0))
+	reg.A = resetBit(reg.A, 0)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
 
 func swapA(mem *memory, reg *register, cbInstr *cbInstruction) int {
-	val := reg.A.val()
+	val := reg.A
 
-	reg.A = byteRegister(val << 4 | val >> 4)
+	reg.A = val << 4 | val >> 4
 	reg.Flag.Z = reg.A == 0
 	reg.Flag.N = false
 	reg.Flag.H = false
 	reg.Flag.C = false
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func slaA(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.Flag.C = reg.A & 0x80 == 1
+	reg.A = reg.A << 1
+
+	reg.Flag.Z = reg.A == 0
+	reg.Flag.N = false
+	reg.Flag.H = false
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }

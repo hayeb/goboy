@@ -125,7 +125,7 @@ func TestLDHL(t *testing.T) {
 	mem.write16(0x1, 0xfefe)
 
 	resultReg := dummyRegs()
-	resultReg.writeDuo(reg_hl, 0xfefe)
+	resultReg.writeDuo(REG_HL, 0xfefe)
 
 	testInstruction(t, mem, regs, ldHl, resultReg, mem, "LD HL")
 }
@@ -134,7 +134,7 @@ func TestLDDHLA(t *testing.T) {
 	regs := dummyRegs()
 	mem := dummyMemory()
 
-	regs.writeDuo(reg_hl, 0x1000)
+	regs.writeDuo(REG_HL, 0x1000)
 	regs.A = 0xfe
 
 	resultMem := dummyMemory()
@@ -142,7 +142,7 @@ func TestLDDHLA(t *testing.T) {
 
 	resultReg := dummyRegs()
 	resultReg.A = byteRegister(0xfe)
-	resultReg.writeDuo(reg_hl, 0xfff)
+	resultReg.writeDuo(REG_HL, 0xfff)
 
 	testInstruction(t, mem, regs, lddHLA, resultReg, mem, "LD (HL-) A")
 }

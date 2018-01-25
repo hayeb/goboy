@@ -49,14 +49,6 @@ const (
 	interruptEnableRegister = 11
 )
 
-// Specific (Special) memory addresses
-const (
-	lcdControlAddress      = 0xff40
-	lcdStatusAddress       = 0xff41
-	currentScanlineAddress = 0xff44
-	targetScanlineAddress  = 0xff45
-)
-
 func memInit(bootrom []uint8, cartridge []uint8) *memory {
 	b0 := [16 * 1024]uint8{}
 	sw := [16 * 1024]uint8{}
@@ -202,10 +194,11 @@ func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 		fmt.Println("Resetting scanline register 0xff44 to 0")
 		return true
 	} else if address == 0xff46 {
-		fmt.Printf("DMA transfer from %#04x", val)
+		fmt.Printf("DMA transfer from %#04x\n", val)
 		for i := 0; i < 0xA0; i++ {
 			memory.spriteAttribMemory[i] = memory.read8(uint16(val) + uint16(i))
 		}
+		return true
 	}
 	return false
 }
@@ -287,10 +280,10 @@ func (memory *memory) doChangeROMRAMMode(val uint8) {
 	}
 }
 
-func (memory *memory) requestInterupt(interuptType int) {
-	//fmt.Println("Interrupt requested")
+func (memory *memory) requestInterupt(interruptType int) {
+	fmt.Printf("Interrupt %d requested", interruptType)
 
-	memory.write8(0xff0f, setBit(memory.read8(0xff0f), uint(interuptType)))
+	memory.write8(0xff0f, setBit(memory.read8(0xff0f), uint(interruptType)))
 }
 
 func (memory *memory) swapBootRom(cartridge []uint8) {
