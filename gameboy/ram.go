@@ -6,18 +6,18 @@ import (
 )
 
 type memory struct {
-	bank0              [16 * 1024]uint8    // 0x0000 (16 kB)
-	switchableRomBank  [16 * 1024]uint8    // 0x4000 (16 kB)
-	videoRam           [8 * 1024]uint8     // 0x8000 (8 kB)
-	switchableRamBank  [4 * 8 * 1024]uint8 // 0xA000 (8 kB)
-	internalRam8kb     [8 * 1024]uint8     // 0xC000 (8 kB)
-	echoInternalRam    [8 * 1024]uint8     // 0xE000 (8 kB)
-	spriteAttribMemory [7680]uint8         // 0xFE00 (7680 B)
-	empty1             [96]uint8           // 0xFEA0 (96 B)
-	ioPorts            [76]uint8           // 0xFF00 (67 B)
-	empty2             [52]uint8           // 0xFF4C (52 B)
-	internalRam         [127]uint8         // 0xFF80 (127 B)
-	interruptEnableRegister uint8          // 0xFFFF (1 B)
+	bank0                   [16 * 1024]uint8    // 0x0000 (16 kB)
+	switchableRomBank       [16 * 1024]uint8    // 0x4000 (16 kB)
+	videoRam                [8 * 1024]uint8     // 0x8000 (8 kB)
+	switchableRamBank       [4 * 8 * 1024]uint8 // 0xA000 (8 kB)
+	internalRam8kb          [8 * 1024]uint8     // 0xC000 (8 kB)
+	echoInternalRam         [8 * 1024]uint8     // 0xE000 (8 kB)
+	spriteAttribMemory      [7680]uint8         // 0xFE00 (7680 B)
+	empty1                  [96]uint8           // 0xFEA0 (96 B)
+	ioPorts                 [76]uint8           // 0xFF00 (67 B)
+	empty2                  [52]uint8           // 0xFF4C (52 B)
+	internalRam             [127]uint8          // 0xFF80 (127 B)
+	interruptEnableRegister uint8               // 0xFFFF (1 B)
 	memorySettings          memorySettings
 }
 
@@ -76,7 +76,7 @@ func memInit(bootrom []uint8, cartridge []uint8) *memory {
 		internalRam:             [127]uint8{},
 		interruptEnableRegister: 0,
 		memorySettings: memorySettings{
-			romBanking: true,
+			romBanking:       true,
 			dma_pending_time: 0,
 		},
 	}
@@ -119,13 +119,13 @@ func (memory *memory) read8(address uint16) uint8 {
 	case switchableRomBank:
 		return memory.switchableRomBank[address-0x4000+uint16(memory.memorySettings.currentROMBank)*0x4000]
 	case videoRam:
-		return memory.videoRam[address - 0x8000]
+		return memory.videoRam[address-0x8000]
 	case switchableRamBank:
 		return memory.switchableRamBank[address-0xA000+uint16(memory.memorySettings.currentRAMBank*0x2000)]
 	case internalRam8kb:
-		return memory.internalRam8kb[address - 0xC000]
+		return memory.internalRam8kb[address-0xC000]
 	case echoInternalRam8kb:
-		return memory.echoInternalRam[address - 0xE000]
+		return memory.echoInternalRam[address-0xE000]
 	case ioPorts:
 		return memory.ioPorts[address-0xff00]
 	case internalRam:
@@ -170,7 +170,7 @@ func (memory *memory) write8(address uint16, val uint8) {
 		memory.internalRam8kb[address-0xc000] = val
 	case echoInternalRam8kb:
 		memory.internalRam8kb[address-0x2000-0xc000] = val
-	// TODO: Not accessible while display is updating
+		// TODO: Not accessible while display is updating
 	case spriteAttribMemory:
 		memory.spriteAttribMemory[address-0xfe00] = val
 	case empty1:
@@ -196,17 +196,25 @@ func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 		return true
 	case 0xFF46:
 		for i := 0; i < 0xA0; i++ {
-			memory.spriteAttribMemory[i] = memory.read8(uint16(val) + uint16(i))
+			memory.spriteAttribMemory[i] = memory.read8(uint16(val)*0x100 + uint16(i))
 		}
 		return true
 	case 0xFF04:
 		fmt.Println("Reset divider to 0")
+		memory.ioPorts[0x04] = 0
+		return true
 	case 0xFF05:
 		fmt.Println("Writing to counter")
+		memory.ioPorts[0x05] = val
+		return true
 	case 0xFF06:
-		fmt.Println("Writing to modulo")
+		fmt.Printf("Writing to modulo: %#04x\n", val)
+		memory.ioPorts[0x06] = val
+		return true
 	case 0xFF07:
 		fmt.Println("Writing to timer control")
+		memory.ioPorts[0x07] = val
+		return true
 
 	}
 	return false
@@ -216,7 +224,7 @@ func (memory *memory) write16(address uint16, val uint16) {
 	switch mapAddr(address) {
 	case bank0:
 		memory.bank0[address] = uint8(val & 0xff)
-		memory.bank0[address+1] = uint8(val  >> 8)
+		memory.bank0[address+1] = uint8(val >> 8)
 	default:
 		panic(fmt.Sprintf("Write halfword not yet implemented for address %#04x", address))
 	}

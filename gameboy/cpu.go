@@ -20,8 +20,12 @@ type input struct {
 }
 
 type timer struct {
-	time int
+	t int
+	m int
+	d int
 }
+
+var breakpoints = []uint16{0x1444, 0x1455, 0x145e, 0x1496}
 
 func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 	ci, mem, reg, instrMap, cbInstrMap, graphics := initializeSystem(cart, bootrom, renderer)
@@ -33,9 +37,15 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 	interruptMaster := true
 	interruptEnableScheduled := false
 	interruptDisableScheduled := false
+	timer := new(timer)
 	for true {
 		oldPC := reg.PC
 
+		for _, val := range breakpoints {
+			if oldPC == val {
+				fmt.Println("Breakpoint!")
+			}
+		}
 		instrLength, name := executeInstruction(mem, reg, instrMap, cbInstrMap)
 
 		if interruptEnableScheduled {
@@ -56,15 +66,57 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 
 		// TODO: Update timers
 		// This is the reason that the license screen is only displayed a short time.
-		//updateTimer(instrLength)
+		updateTimer(mem, timer, instrLength)
 		graphics.updateGraphics(instrLength)
 		handleInterupts(mem, reg, interruptMaster)
-
 		handleInput(&input, mem)
 
 		// Swap out the boot rom
 		if oldPC == 0xfe {
 			mem.swapBootRom(cart)
+		}
+	}
+}
+
+func updateTimer(mem *memory, timer *timer, cycles int) {
+	timer.t += cycles
+
+	if timer.t >= 16 {
+		timer.m++
+		timer.t -= 16
+		timer.d++
+		if timer.d == 16 {
+			timer.d = 0
+			val := mem.ioPorts[0x04]
+			mem.ioPorts[0x04] = val + 1
+		}
+	}
+
+	tac := mem.ioPorts[0x07]
+
+	// If the timer is turned on,
+	t := 0
+	if testBit(tac, 2) {
+		val := tac & 0x3
+		switch val {
+		case 0:
+			t = 64
+		case 1:
+			t = 1
+		case 2:
+			t = 4
+		case 3:
+			t = 16
+		}
+
+		if timer.m >= t {
+			timer.m = 0
+			mem.ioPorts[0x05]++
+
+			if mem.ioPorts[0x05] == 0 {
+				mem.ioPorts[0x05] = mem.ioPorts[0x06]
+				mem.ioPorts[0x0F] |= 0x4
+			}
 		}
 	}
 }
@@ -129,18 +181,14 @@ func handleInput(input *input, mem *memory) {
 	updateJoyReg(input, mem)
 }
 
-func updateTimer(timer *timer, length int) {
-
-}
-
 func updateJoyReg(input *input, mem *memory) {
-	joyPadReg := mem.read8(0xFF00)
+	joyPadReg := mem.ioPorts[0x00]
 	if !testBit(joyPadReg, 4) && !testBit(joyPadReg, 5) {
 		// Do nothing when input is not polled
 		return
 	} else if testBit(joyPadReg, 4) && testBit(joyPadReg, 5) {
 		// Reset the register
-		mem.write8(0xFF00, 0)
+		mem.write8(0xFF00, 0xf)
 		return
 	}
 
@@ -184,14 +232,14 @@ func updateJoyReg(input *input, mem *memory) {
 		if input.RIGHT {
 			joyPadReg = resetBit(joyPadReg, 0)
 		} else {
-			joyPadReg = setBit(joyPadReg, 1)
+			joyPadReg = setBit(joyPadReg, 0)
 		}
 	}
 
 	joyPadReg = resetBit(joyPadReg, 4)
 	joyPadReg = resetBit(joyPadReg, 5)
 
-	mem.write8(0xFF00, joyPadReg)
+	mem.ioPorts[0x00] = joyPadReg
 }
 
 func handleInterupts(mem *memory, reg *register, master bool) {
@@ -215,6 +263,7 @@ func serviceInterupt(mem *memory, reg *register, i int, requested uint8) {
 
 	switch i {
 	case 0:
+		fmt.Println("Servicing VBLANK interrupt")
 		reg.PC = 0x40
 	case 1:
 		fmt.Println("Servicing LCD interrupt")
@@ -242,10 +291,8 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]*instruc
 
 	if instr.name != "CB" {
 		//fmt.Printf("%#04x\t%s\n", reg.PC, instr.name)
-
 		cycles := instr.executor(mem, reg, instr)
 
-		//fmt.Println(regdump(reg))
 		return cycles, instr.name
 	} else {
 		cbCode := mem.read8(reg.PC + 1)

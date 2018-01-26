@@ -2,7 +2,6 @@ package gameboy
 
 import (
 	"github.com/banthar/Go-SDL/sdl"
-	"fmt"
 )
 
 const (
@@ -99,25 +98,25 @@ func (graphics *graphics) drawCurrentLine() {
 		return
 	}
 
+	background := new([160]uint8)
 	if testBit(lcdc, 0) {
-		graphics.drawBackground()
+		graphics.drawBackground(background)
 	}
 
 	if testBit(lcdc, 1) {
-		graphics.drawSprites()
+		graphics.drawSprites(background)
 	}
 }
 
-func (graphics *graphics) drawSprites() {
+func (graphics *graphics) drawSprites(background *[160]uint8) {
 	var mem = graphics.memory
 
-	bytesInSprite := uint8(16)
-	if testBit(mem.read8(0xFF00), 2) {
-		fmt.Println("8*16 sprites")
+	bytesInSprite := uint16(16)
+	if testBit(mem.read8(0xFF40), 2) {
 		bytesInSprite = 32
 	}
-	for i := 0; i < 40; i++ {
-		address := i * 4
+	for i := uint16(0); i < 40; i++ {
+		var address = i * 4
 
 		// Y top left on screen
 		y := mem.spriteAttribMemory[address] - 16
@@ -135,18 +134,19 @@ func (graphics *graphics) drawSprites() {
 		// Several options for this sprite
 		spriteFlags := mem.spriteAttribMemory[address+3]
 
-		rowAddress := tileNumber * bytesInSprite
+		lineNumber := uint16(graphics.line - y)
+
 		if testBit(spriteFlags, 6) {
-			rowAddress += (bytesInSprite/2 - 1) - (graphics.line - y)
-		} else {
-			rowAddress += graphics.line - y
+			lineNumber = (bytesInSprite/2 - 1) - uint16(graphics.line-y)
 		}
+
+		var rowAddress = uint16(tileNumber)*bytesInSprite + lineNumber*2
 
 		for j := uint8(0); j < 8; j++ {
 			if x+j < 0 || x+j > 160 {
 				continue
 			}
-
+			//
 			lowerByte := mem.videoRam[rowAddress]
 			higherByte := mem.videoRam[rowAddress+1]
 
@@ -160,6 +160,10 @@ func (graphics *graphics) drawSprites() {
 
 			colorByte := higherBit<<1 | lowerBit
 
+			if colorByte == 0 {
+				continue
+			}
+
 			paletteAddress := uint16(0xFF48)
 			if testBit(spriteFlags, 4) {
 				paletteAddress++
@@ -167,10 +171,9 @@ func (graphics *graphics) drawSprites() {
 
 			priority := testBit(spriteFlags, 7)
 			color := graphics.getColor(colorByte, paletteAddress)
-			backgroundColor := graphics.getColor(0, 0xFF47)
-			hidden := backgroundColor.r == color.r && backgroundColor.g == color.g && backgroundColor.b == color.b
+			hidden := background[x+j] != 0
 
-			if !(priority && hidden) {
+			if priority && hidden {
 				continue
 			}
 			graphics.screen[graphics.line][x+j] = color
@@ -178,7 +181,7 @@ func (graphics *graphics) drawSprites() {
 	}
 }
 
-func (graphics *graphics) drawBackground() {
+func (graphics *graphics) drawBackground(background *[160]uint8) {
 
 	// TODO: Draw window
 	var tileMapAddress uint16 = 0x1800
@@ -218,6 +221,7 @@ func (graphics *graphics) drawBackground() {
 		colorByte := higherBit<<1 | lowerBit
 
 		graphics.screen[graphics.line][i] = graphics.getColor(colorByte, 0xff47)
+		background[i] = colorByte
 
 		x++
 		if x == 8 {
