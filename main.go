@@ -21,7 +21,7 @@ func main() {
 
 	sdl.Init(sdl.INIT_EVERYTHING)
 
-	window := sdl.SetVideoMode(4 * 160, 4 * 144, 32, 0)
+	window := sdl.SetVideoMode(4 * 160, 4 * 144, 32, sdl.HWACCEL)
 	sdl.JoystickEventState(sdl.DISABLE)
 
 	gameboy.Run(cartridge, bootrom, window)

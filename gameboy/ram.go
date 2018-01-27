@@ -62,7 +62,7 @@ func memInit(bootrom []uint8, cartridge []uint8) *memory {
 		sw[j] = cartridge[j+len(sw)]
 	}
 
-	return &memory{
+	mem := &memory{
 		bank0:                   b0,
 		switchableRomBank:       sw,
 		videoRam:                [8 * 1024]uint8{},
@@ -80,6 +80,7 @@ func memInit(bootrom []uint8, cartridge []uint8) *memory {
 			dma_pending_time: 0,
 		},
 	}
+	return mem
 }
 
 func mapAddr(addr uint16) int {
@@ -193,7 +194,11 @@ func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 	case 0xFF44:
 		// Reset the scanline to 0
 		fmt.Println("Resetting scanline register 0xff44 to 0")
+		memory.ioPorts[44] = 0
 		return true
+	case 0xFF45:
+		fmt.Printf("Writing to LYC: %#04x\n", val)
+		return false
 	case 0xFF46:
 		for i := 0; i < 0xA0; i++ {
 			memory.spriteAttribMemory[i] = memory.read8(uint16(val)*0x100 + uint16(i))

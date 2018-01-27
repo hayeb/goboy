@@ -87,6 +87,12 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 			graphics.drawCurrentLine()
 		}
 	}
+
+	lyc := graphics.memory.ioPorts[0x45]
+
+	if lyc == graphics.line {
+		graphics.memory.write8(0xFF0F, setBit(graphics.memory.read8(0xFF0F), 1))
+	}
 }
 
 /**

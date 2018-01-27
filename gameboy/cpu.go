@@ -25,8 +25,6 @@ type timer struct {
 	d int
 }
 
-var breakpoints = []uint16{0x1444, 0x1455, 0x145e, 0x1496}
-
 func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 	ci, mem, reg, instrMap, cbInstrMap, graphics := initializeSystem(cart, bootrom, renderer)
 	input := input{}
@@ -40,12 +38,6 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 	timer := new(timer)
 	for true {
 		oldPC := reg.PC
-
-		for _, val := range breakpoints {
-			if oldPC == val {
-				fmt.Println("Breakpoint!")
-			}
-		}
 		instrLength, name := executeInstruction(mem, reg, instrMap, cbInstrMap)
 
 		if interruptEnableScheduled {
@@ -64,11 +56,9 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 			interruptMaster = true
 		}
 
-		// TODO: Update timers
-		// This is the reason that the license screen is only displayed a short time.
 		updateTimer(mem, timer, instrLength)
 		graphics.updateGraphics(instrLength)
-		handleInterupts(mem, reg, interruptMaster)
+		handleInterrupts(mem, reg, interruptMaster)
 		handleInput(&input, mem)
 
 		// Swap out the boot rom
@@ -81,11 +71,11 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 func updateTimer(mem *memory, timer *timer, cycles int) {
 	timer.t += cycles
 
-	if timer.t >= 16 {
+	if timer.t >= 4 {
 		timer.m++
-		timer.t -= 16
+		timer.t -= 4
 		timer.d++
-		if timer.d == 16 {
+		if timer.d == 4 {
 			timer.d = 0
 			val := mem.ioPorts[0x04]
 			mem.ioPorts[0x04] = val + 1
@@ -242,7 +232,7 @@ func updateJoyReg(input *input, mem *memory) {
 	mem.ioPorts[0x00] = joyPadReg
 }
 
-func handleInterupts(mem *memory, reg *register, master bool) {
+func handleInterrupts(mem *memory, reg *register, master bool) {
 	if !master {
 		return
 	}
@@ -251,19 +241,18 @@ func handleInterupts(mem *memory, reg *register, master bool) {
 	if req > 0 {
 		for i := 0; i < 5; i += 1 {
 			if testBit(req, uint(i)) && testBit(enabled, uint(i)) {
-				serviceInterupt(mem, reg, i, req)
+				serviceInterrupt(mem, reg, i, req)
 			}
 		}
 	}
 }
 
-func serviceInterupt(mem *memory, reg *register, i int, requested uint8) {
+func serviceInterrupt(mem *memory, reg *register, i int, requested uint8) {
 	mem.write8(0xff0f, resetBit(requested, uint(i)))
 	pushStack16(mem, reg, reg.PC)
 
 	switch i {
 	case 0:
-		fmt.Println("Servicing VBLANK interrupt")
 		reg.PC = 0x40
 	case 1:
 		fmt.Println("Servicing LCD interrupt")
@@ -347,8 +336,4 @@ func initializeSystem(cart []uint8, bootrom []uint8, ren *sdl.Surface) (*cartrid
 	graphics := createGraphics(mem, ren, cartridgeInfo)
 	registers := new(register)
 	return cartridgeInfo, mem, registers, instructionMap, cbInstrucionMap, graphics
-}
-
-func regdump(reg *register) string {
-	return fmt.Sprintf("A: %#02x\tB: %#02x\tC: %#02x\tD: %#02x\tE: %#02x\tF: %#02x\nAF: %#04x\tBC: %#04x\tDE: %#04x\tHL: %#04x", reg.A, reg.B, reg.C, reg.D, reg.E, reg.F, reg.readDuo(REG_AF), reg.readDuo(REG_BC), reg.readDuo(REG_DE), reg.readDuo(REG_HL))
 }
