@@ -15,8 +15,13 @@ type cbInstructionExecutor func(mem *memory, reg *register, cbInstr *cbInstructi
 func createCBInstructionMap() *map[uint8]*cbInstruction {
 	return &map[uint8]*cbInstruction{
 		0x11: newCBInstruction("RL C", 2, 8, rl_c),
+		0x1a: newCBInstruction("RR D", 2, 8, rrD),
+		0x1b: newCBInstruction("RR E", 2, 8, rrE),
+		0x19: newCBInstruction("RR C", 2, 8, rrC),
 		0x27: newCBInstruction("SLA A", 2, 8, slaA),
+		0x33: newCBInstruction("SWAP E", 2, 8, swapE),
 		0x37: newCBInstruction("SWAP A", 2, 8, swapA),
+		0x38: newCBInstruction("SRL B", 2, 8, srlB),
 		0x3f: newCBInstruction("SRL A", 2, 8, srlA),
 		0x40: newCBInstruction("BIT 0,B", 2, 8, bit_0_b),
 		0x41: newCBInstruction("BIT 0,C", 2, 8, bit_0_c),
@@ -32,13 +37,15 @@ func createCBInstructionMap() *map[uint8]*cbInstruction {
 		0x69: newCBInstruction("BIT 5,C", 2, 8, bit_5_c),
 		0x6f: newCBInstruction("BIT 5,A", 2, 8, bit_5_a),
 		0x70: newCBInstruction("BIT 6,B", 2, 8, bit_6_b),
+		0x71: newCBInstruction("BIT 6,C", 2, 8, bit_6_c),
 		0x77: newCBInstruction("BIT 6,A", 2, 8, bit_6_a),
 		0x78: newCBInstruction("BIT 7,B", 2, 8, bit_7_b),
 		0x7c: newCBInstruction("BIT 7,H", 2, 8, bit_7_h),
 		0x7e: newCBInstruction("BIT 7,(HL)", 2, 16, bit_7_hl),
-		0x7f: newCBInstruction("BIT 7, A", 2, 8, bit_7_a),
-		0x87: newCBInstruction("RES 0, a", 2, 8, res0A),
-		0x9e: newCBInstruction("RES 3, (HL)", 2, 8, res3hl),
+		0x7f: newCBInstruction("BIT 7,A", 2, 8, bit_7_a),
+		0x86: newCBInstruction("RES 0,(HL)", 2, 16, res0hl),
+		0x87: newCBInstruction("RES 0,A", 2, 8, res0A),
+		0x9e: newCBInstruction("RES 3,(HL)", 2, 8, res3hl),
 		0xbe: newCBInstruction("RES 7,(HL)", 2, 8, res7hl),
 		0xde: newCBInstruction("SET 3,(HL)", 2, 16, set3hl),
 		0xfe: newCBInstruction("SET 7,(HL)", 2, 16, set_7_hl),
@@ -150,6 +157,13 @@ func bit_6_b(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
+func bit_6_c(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(6, reg.B)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
 func bit_5_b(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.bit(5, reg.B)
 
@@ -192,7 +206,7 @@ func bit_7_hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
-func rl_c(mem *memory, reg *register, cbInstr *cbInstruction) int {
+func rl_c(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	isCarrySet := reg.Flag.C
 	isMSBSet := testBit(reg.C, 7)
 
@@ -217,8 +231,14 @@ func rl_c(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
-func res0A(mem *memory, reg *register, cbInstr *cbInstruction) int {
+func res0A(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.A = resetBit(reg.A, 0)
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func res0hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	mem.write8(reg.readDuo(REG_HL), resetBit(mem.read8(reg.readDuo(REG_HL)), 0))
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
@@ -235,7 +255,7 @@ func res7hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
-func swapA(mem *memory, reg *register, cbInstr *cbInstruction) int {
+func swapA(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	val := reg.A
 
 	reg.A = val<<4 | val>>4
@@ -247,7 +267,19 @@ func swapA(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
-func slaA(mem *memory, reg *register, cbInstr *cbInstruction) int {
+func swapE(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	val := reg.E
+
+	reg.E = val<<4 | val>>4
+	reg.Flag.Z = reg.E == 0
+	reg.Flag.N = false
+	reg.Flag.H = false
+	reg.Flag.C = false
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func slaA(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.Flag.C = reg.A>>7 == 1
 	reg.A = reg.A << 1
 
@@ -283,6 +315,46 @@ func srlA(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.Flag.H = false
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
+}
+
+func srlB(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.Flag.C = reg.B & 0x1 == 1
+	reg.B >>= 1
+
+	reg.Flag.Z = reg.B == 0
+	reg.Flag.N = false
+	reg.Flag.H = false
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func rrC(_ *memory, reg *register, _ *cbInstruction) int {
+	return rotateRight(&reg.C, reg)
+}
+
+func rrD(_ *memory, reg *register, _ *cbInstruction) int {
+	return rotateRight(&reg.D, reg)
+}
+
+func rrE(_ *memory, reg *register, _ *cbInstruction) int {
+	return rotateRight(&reg.E, reg)
+}
+
+func rotateRight(r *uint8, reg *register) int {
+	val := *r
+	carry := reg.Flag.C
+
+	reg.C = val >> 1
+	if carry {
+		setBit(reg.C, 7)
+	}
+
+	reg.Flag.Z = reg.C == 0
+	reg.Flag.N = false
+	reg.Flag.H = false
+	reg.Flag.C = reg.C & 0x1 == 1
+	reg.incPC(2)
+	return 8
 }
 
 

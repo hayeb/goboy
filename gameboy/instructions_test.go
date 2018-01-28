@@ -100,7 +100,7 @@ func TestLDSP(t *testing.T) {
 	resultReg := dummyRegs()
 	resultReg.SP = halfWordRegister(0xfefe)
 
-	testInstruction(t, mem, regs, ldSp, resultReg, mem, "LD SP")
+	testInstruction(t, mem, regs, ldSpd16, resultReg, mem, "LD SP")
 }
 
 func TestXOR(t *testing.T) {

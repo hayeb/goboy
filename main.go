@@ -16,7 +16,7 @@ func main() {
 	bootrom, error1 := ioutil.ReadFile("resources/DMG_ROM.bin")
 	check(error1)
 
-	cartridge, error2 := ioutil.ReadFile("resources/tetris.gb")
+	cartridge, error2 := ioutil.ReadFile("resources/07.gb.gb")
 	check(error2)
 
 	sdl.Init(sdl.INIT_EVERYTHING)

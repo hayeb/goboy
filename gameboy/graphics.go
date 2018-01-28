@@ -2,6 +2,7 @@ package gameboy
 
 import (
 	"github.com/banthar/Go-SDL/sdl"
+	"fmt"
 )
 
 const (
@@ -55,7 +56,7 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 			graphics.line += 1
 
 			// If this is the last line, enter VBLANK
-			if graphics.line == 143 {
+			if graphics.line == 144 {
 				graphics.mode = 1
 				graphics.showData()
 				graphics.memory.write8(0xff0f, setBit(graphics.memory.read8(0xff0f), 0))
@@ -87,12 +88,6 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 			graphics.drawCurrentLine()
 		}
 	}
-
-	lyc := graphics.memory.ioPorts[0x45]
-
-	if lyc == graphics.line {
-		graphics.memory.write8(0xFF0F, setBit(graphics.memory.read8(0xFF0F), 1))
-	}
 }
 
 /**
@@ -119,6 +114,7 @@ func (graphics *graphics) drawSprites(background *[160]uint8) {
 
 	bytesInSprite := uint16(16)
 	if testBit(mem.read8(0xFF40), 2) {
+		fmt.Println("8*16")
 		bytesInSprite = 32
 	}
 	for i := uint16(0); i < 40; i++ {
@@ -188,7 +184,6 @@ func (graphics *graphics) drawSprites(background *[160]uint8) {
 }
 
 func (graphics *graphics) drawBackground(background *[160]uint8) {
-
 	// TODO: Draw window
 	var tileMapAddress uint16 = 0x1800
 

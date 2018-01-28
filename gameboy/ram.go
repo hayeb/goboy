@@ -128,9 +128,11 @@ func (memory *memory) read8(address uint16) uint8 {
 	case echoInternalRam8kb:
 		return memory.echoInternalRam[address-0xE000]
 	case ioPorts:
-		return memory.ioPorts[address-0xff00]
+		return memory.ioPorts[address-0xFF00]
+	case empty2:
+		return memory.empty2[address - 0xFF4C]
 	case internalRam:
-		return memory.internalRam[address-0xff80]
+		return memory.internalRam[address-0xFF80]
 	case interruptEnableRegister:
 		return memory.interruptEnableRegister
 	default:
@@ -147,7 +149,9 @@ func (memory *memory) read16(address uint16) uint16 {
 		return uint16(memory.switchableRomBank[taddress]) | (uint16(memory.switchableRomBank[taddress+1]) << 8)
 	case switchableRamBank:
 		taddr := address - 0xA000 + uint16(memory.memorySettings.currentRAMBank*0x2000)
-		return uint16(memory.switchableRamBank[taddr]) | uint16(memory.switchableRamBank[taddr+1])
+		return uint16(memory.switchableRamBank[taddr]) | uint16(memory.switchableRamBank[taddr+1])<<8
+	case internalRam8kb:
+		return uint16(memory.internalRam8kb[address-0xC000]) | uint16(memory.internalRam8kb[address-0xC000+1]) << 8
 	case ioPorts:
 		return uint16(memory.ioPorts[address-0xff00]) | (uint16(memory.ioPorts[address-0xff00+1]) << 8)
 	default:
@@ -191,10 +195,14 @@ func (memory *memory) write8(address uint16, val uint8) {
 
 func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 	switch address {
+	case 0xFF40:
+		fmt.Printf("Writing to LCDC: %b\n", val)
+		memory.ioPorts[0x40] = val
+		return true
 	case 0xFF44:
 		// Reset the scanline to 0
 		fmt.Println("Resetting scanline register 0xff44 to 0")
-		memory.ioPorts[44] = 0
+		memory.ioPorts[0x44] = 0
 		return true
 	case 0xFF45:
 		fmt.Printf("Writing to LYC: %#04x\n", val)
@@ -209,7 +217,7 @@ func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 		memory.ioPorts[0x04] = 0
 		return true
 	case 0xFF05:
-		fmt.Println("Writing to counter")
+		fmt.Printf("Writing to counter: %#04x\n", val)
 		memory.ioPorts[0x05] = val
 		return true
 	case 0xFF06:
@@ -217,10 +225,9 @@ func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 		memory.ioPorts[0x06] = val
 		return true
 	case 0xFF07:
-		fmt.Println("Writing to timer control")
+		fmt.Printf("Writing to timer control: %b\n", val)
 		memory.ioPorts[0x07] = val
 		return true
-
 	}
 	return false
 }
@@ -228,8 +235,11 @@ func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 func (memory *memory) write16(address uint16, val uint16) {
 	switch mapAddr(address) {
 	case bank0:
-		memory.bank0[address] = uint8(val & 0xff)
+		memory.bank0[address] = uint8(val)
 		memory.bank0[address+1] = uint8(val >> 8)
+	case internalRam8kb:
+		memory.internalRam8kb[address - 0xC000] = uint8(val)
+		memory.internalRam8kb[address - 0xC000 + 1] = uint8(val >> 8)
 	default:
 		panic(fmt.Sprintf("Write halfword not yet implemented for address %#04x", address))
 	}

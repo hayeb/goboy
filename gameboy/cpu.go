@@ -26,19 +26,47 @@ type timer struct {
 }
 
 func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
-	ci, mem, reg, instrMap, cbInstrMap, graphics := initializeSystem(cart, bootrom, renderer)
+	_, mem, reg, instrMap, cbInstrMap, graphics := initializeSystem(cart, bootrom, renderer)
 	input := input{}
 
-	if ci.ramSize != ram_none || ci.romSize != rom_kbit_256 {
-		panic("Cartridge not supported")
-	}
+	//if ci.ramSize != ram_none || ci.romSize != rom_kbit_256 {
+	//	panic("Cartridge not supported")
+	//}
 	interruptMaster := true
 	interruptEnableScheduled := false
 	interruptDisableScheduled := false
 	timer := new(timer)
+	halted := false
+	stopped := false
+	bootromSwapped := false
 	for true {
+		if halted || stopped {
+			updateTimer(mem, timer, 4)
+
+			if halted {
+				graphics.updateGraphics(4)
+				if handleInterrupts(mem, reg, interruptMaster) {
+					halted = false
+				}
+
+			}
+
+			if stopped {
+				if handleInput(&input, mem) {
+					stopped = false
+				}
+			}
+
+			continue
+		}
+
 		oldPC := reg.PC
 		instrLength, name := executeInstruction(mem, reg, instrMap, cbInstrMap)
+
+		if oldPC == 0x20b {
+			fmt.Println("BREAK!")
+		}
+
 
 		if interruptEnableScheduled {
 			interruptEnableScheduled = false
@@ -54,16 +82,24 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 			interruptEnableScheduled = true
 		} else if name == "RETI" {
 			interruptMaster = true
+		} else if name == "HALT" {
+			halted = true
+		} else if name == "stop" {
+			stopped = true
 		}
+
 
 		updateTimer(mem, timer, instrLength)
 		graphics.updateGraphics(instrLength)
-		handleInterrupts(mem, reg, interruptMaster)
+		if handleInterrupts(mem, reg, interruptMaster) {
+			halted = false
+		}
 		handleInput(&input, mem)
 
 		// Swap out the boot rom
-		if oldPC == 0xfe {
+		if oldPC == 0xfe && !bootromSwapped {
 			mem.swapBootRom(cart)
+			bootromSwapped = true
 		}
 	}
 }
@@ -71,11 +107,11 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 func updateTimer(mem *memory, timer *timer, cycles int) {
 	timer.t += cycles
 
-	if timer.t >= 4 {
+	if timer.t >= 16 {
 		timer.m++
-		timer.t -= 4
+		timer.t -= 16
 		timer.d++
-		if timer.d == 4 {
+		if timer.d == 16 {
 			timer.d = 0
 			val := mem.ioPorts[0x04]
 			mem.ioPorts[0x04] = val + 1
@@ -111,75 +147,74 @@ func updateTimer(mem *memory, timer *timer, cycles int) {
 	}
 }
 
-func handleInput(input *input, mem *memory) {
-	for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-		switch t := event.(type) {
-		case *sdl.KeyboardEvent:
-			switch t.Keysym.Sym {
-			case sdl.K_a:
-				if t.Type == sdl.KEYDOWN {
-					input.A = true
-				} else {
-					input.A = false
-				}
-			case sdl.K_b:
-				if t.Type == sdl.KEYDOWN {
-					input.B = true
-				} else {
-					input.B = false
-				}
-			case sdl.K_LEFT:
-				if t.Type == sdl.KEYDOWN {
-					input.LEFT = true
-				} else {
-					input.LEFT = false
-				}
-			case sdl.K_RIGHT:
-				if t.Type == sdl.KEYDOWN {
-					input.RIGHT = true
-				} else {
-					input.RIGHT = false
-				}
-			case sdl.K_UP:
-				if t.Type == sdl.KEYDOWN {
-					input.UP = true
-				} else {
-					input.UP = false
-				}
-			case sdl.K_DOWN:
-				if t.Type == sdl.KEYDOWN {
-					input.DOWN = true
-				} else {
-					input.DOWN = false
-				}
-			case sdl.K_RETURN:
-				if t.Type == sdl.KEYDOWN {
-					input.ENTER = true
-				} else {
-					input.ENTER = false
-				}
-			case sdl.K_SPACE:
-				if t.Type == sdl.KEYDOWN {
-					input.SPACE = true
-				} else {
-					input.SPACE = false
-				}
+func handleInput(input *input, mem *memory) bool {
+	event := sdl.PollEvent()
+	switch t := event.(type) {
+	case *sdl.KeyboardEvent:
+		switch t.Keysym.Sym {
+		case sdl.K_a:
+			if t.Type == sdl.KEYDOWN {
+				input.A = true
+			} else {
+				input.A = false
+			}
+		case sdl.K_b:
+			if t.Type == sdl.KEYDOWN {
+				input.B = true
+			} else {
+				input.B = false
+			}
+		case sdl.K_LEFT:
+			if t.Type == sdl.KEYDOWN {
+				input.LEFT = true
+			} else {
+				input.LEFT = false
+			}
+		case sdl.K_RIGHT:
+			if t.Type == sdl.KEYDOWN {
+				input.RIGHT = true
+			} else {
+				input.RIGHT = false
+			}
+		case sdl.K_UP:
+			if t.Type == sdl.KEYDOWN {
+				input.UP = true
+			} else {
+				input.UP = false
+			}
+		case sdl.K_DOWN:
+			if t.Type == sdl.KEYDOWN {
+				input.DOWN = true
+			} else {
+				input.DOWN = false
+			}
+		case sdl.K_RETURN:
+			if t.Type == sdl.KEYDOWN {
+				input.ENTER = true
+			} else {
+				input.ENTER = false
+			}
+		case sdl.K_SPACE:
+			if t.Type == sdl.KEYDOWN {
+				input.SPACE = true
+			} else {
+				input.SPACE = false
 			}
 		}
 	}
 
-	updateJoyReg(input, mem)
+	return updateJoyReg(input, mem)
 }
 
-func updateJoyReg(input *input, mem *memory) {
+func updateJoyReg(input *input, mem *memory) bool {
 	joyPadReg := mem.ioPorts[0x00]
 	if !testBit(joyPadReg, 4) && !testBit(joyPadReg, 5) {
 		// Do nothing when input is not polled
-		return
+		return false
 	} else if testBit(joyPadReg, 4) && testBit(joyPadReg, 5) {
 		// Reset the register
 		mem.write8(0xFF00, 0xf)
-		return
+		return false
 	}
 
 	if testBit(joyPadReg, 4) {
@@ -230,21 +265,26 @@ func updateJoyReg(input *input, mem *memory) {
 	joyPadReg = resetBit(joyPadReg, 5)
 
 	mem.ioPorts[0x00] = joyPadReg
+
+	return joyPadReg < 0xf
 }
 
-func handleInterrupts(mem *memory, reg *register, master bool) {
+func handleInterrupts(mem *memory, reg *register, master bool) bool {
 	if !master {
-		return
+		return false
 	}
 	req := mem.read8(0xff0f)
 	enabled := mem.read8(0xffff)
+	handled := false
 	if req > 0 {
 		for i := 0; i < 5; i += 1 {
 			if testBit(req, uint(i)) && testBit(enabled, uint(i)) {
 				serviceInterrupt(mem, reg, i, req)
+				handled = true
 			}
 		}
 	}
+	return handled
 }
 
 func serviceInterrupt(mem *memory, reg *register, i int, requested uint8) {
@@ -258,7 +298,6 @@ func serviceInterrupt(mem *memory, reg *register, i int, requested uint8) {
 		fmt.Println("Servicing LCD interrupt")
 		reg.PC = 0x48
 	case 2:
-		fmt.Println("Servicing TIMER interrupt")
 		reg.PC = 0x50
 	case 4:
 		fmt.Println("Servicing JOYPAD interrupt")
@@ -279,7 +318,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]*instruc
 	}
 
 	if instr.name != "CB" {
-		//fmt.Printf("%#04x\t%s\n", reg.PC, instr.name)
+		fmt.Printf("%#04x\t%s\n", reg.PC, instr.name)
 		cycles := instr.executor(mem, reg, instr)
 
 		return cycles, instr.name
@@ -289,7 +328,7 @@ func executeInstruction(mem *memory, reg *register, instrMap *map[uint8]*instruc
 		if !ok {
 			panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, reg.PC))
 		}
-		//fmt.Printf("%#04x\t%s %s\n", reg.PC, instr.name, cb.name)
+		fmt.Printf("%#04x\t%s %s\n", reg.PC, instr.name, cb.name)
 		cycles := cb.executor(mem, reg, cb)
 		return cycles + 4, cb.name
 	}
