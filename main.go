@@ -25,7 +25,7 @@ func main() {
 
 	flag.Parse()
 
-	if rom == nil || *rom == ""{
+	if rom == nil || *rom == "" {
 		fmt.Println("Please specify a rom using -rom")
 		os.Exit(1)
 	}
@@ -40,7 +40,6 @@ func main() {
 		os.Exit(1)
 	}
 
-
 	cartridge, error2 := ioutil.ReadFile(*rom)
 	check(error2)
 
@@ -51,5 +50,71 @@ func main() {
 	sdl.JoystickEventState(sdl.DISABLE)
 
 	gb := gameboy.Initialize(cartridge, window, &gameboy.Options{Scaling: *scale, Debug: *debug, Speed: *speed})
-	gb.Run()
+
+	input := gameboy.Input{}
+	for true {
+		gb.Step()
+		updateInput(&input)
+		gb.HandleInput(&input)
+	}
+}
+
+func updateInput(input *gameboy.Input) {
+	for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+		switch t := event.(type) {
+		case *sdl.KeyboardEvent:
+			switch t.Keysym.Sym {
+			case sdl.K_a:
+				if t.Type == sdl.KEYDOWN {
+					input.A = true
+				} else {
+					input.A = false
+				}
+			case sdl.K_b:
+				if t.Type == sdl.KEYDOWN {
+					input.B = true
+				} else {
+					input.B = false
+				}
+			case sdl.K_LEFT:
+				if t.Type == sdl.KEYDOWN {
+					input.LEFT = true
+				} else {
+					input.LEFT = false
+				}
+			case sdl.K_RIGHT:
+				if t.Type == sdl.KEYDOWN {
+					input.RIGHT = true
+				} else {
+					input.RIGHT = false
+				}
+			case sdl.K_UP:
+				if t.Type == sdl.KEYDOWN {
+					input.UP = true
+				} else {
+					input.UP = false
+				}
+			case sdl.K_DOWN:
+				if t.Type == sdl.KEYDOWN {
+					input.DOWN = true
+				} else {
+					input.DOWN = false
+				}
+			case sdl.K_RETURN:
+				if t.Type == sdl.KEYDOWN {
+					input.ENTER = true
+				} else {
+					input.ENTER = false
+				}
+			case sdl.K_SPACE:
+				if t.Type == sdl.KEYDOWN {
+					input.SPACE = true
+				} else {
+					input.SPACE = false
+				}
+			}
+		case *sdl.QuitEvent:
+			os.Exit(0)
+		}
+	}
 }

@@ -38,7 +38,6 @@ func createInstructionMap() *map[uint8]*instruction {
 		0x0d: newInstruction("DEC C", 1, 4, decC),
 		0x0e: newInstruction("LD C,d8", 2, 8, ldC),
 
-		0x10: newInstruction("STOP 0", 2, 4, stop),
 		0x11: newInstruction("LD DE,d16", 3, 12, ldDeD16),
 		0x12: newInstruction("LD (DE),A", 1, 8, ldDeA),
 		0x13: newInstruction("INC DE", 1, 8, incDE),
@@ -1480,11 +1479,6 @@ func ldA16Sp(mem *memory, reg *register, instr *instruction) int {
 func ldSpHl(_ *memory, reg *register, instr *instruction) int {
 	reg.SP = reg.readDuo(REG_HL)
 
-	reg.incPC(instr.bytes)
-	return instr.durationAction
-}
-
-func stop(_ *memory, reg *register, instr *instruction) int {
 	reg.incPC(instr.bytes)
 	return instr.durationAction
 }

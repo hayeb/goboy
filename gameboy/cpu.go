@@ -3,142 +3,52 @@ package gameboy
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/banthar/Go-SDL/sdl"
 )
 
 var _ = spew.Config
 
-type input struct {
-	A     bool
-	B     bool
-	LEFT  bool
-	RIGHT bool
-	UP    bool
-	DOWN  bool
-	ENTER bool
-	SPACE bool
-}
-
-type timer struct {
-	t int
-	m int
-	d int
-}
-
-type Options struct {
-	Scaling int
-	Debug   bool
-	Speed   int
-}
-
-type gameboy struct {
-	cartridgeInfo  *cartridgeInfo
-	instructionMap *map[uint8]*instruction
-	cbInstruction  *map[uint8]*cbInstruction
-	mem            *memory
-	graphics       *graphics
-	reg            *register
-	options        *Options
-	cartridge      []uint8
-
-	timer *timer
-	input *input
-
-	interruptMaster           bool
-	interruptEnableScheduled  bool
-	interruptDisableScheduled bool
-	halted                    bool
-	stopped                   bool
-	bootromSwapped            bool
-}
-
-type IGameboy interface {
-	Run()
-}
-
-func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) IGameboy {
-	instructionMap := createInstructionMap()
-	cbInstrucionMap := createCBInstructionMap()
-	mem := memInit(cart)
-	graphics := createGraphics(mem.videoRam[:], mem.ioPorts[:], mem.spriteAttribMemory[:], renderer, options.Speed, options.Scaling)
-	registers := new(register)
-	cartInfo := createCartridgeInfo(cart)
-
-	gameboy := gameboy{
-		cartridgeInfo:   cartInfo,
-		instructionMap:  instructionMap,
-		cbInstruction:   cbInstrucionMap,
-		mem:             mem,
-		graphics:        graphics,
-		reg:             registers,
-		options:         options,
-		cartridge:       cart,
-		timer:           new(timer),
-		interruptMaster: true,
-		input:           new(input),
-	}
-
-	fmt.Printf("Initialized:\n%s", cartridgeInfoString(*cartInfo))
-	return &gameboy
-}
-
-func (gb *gameboy) Run() {
-	for true {
-		if gb.halted || gb.stopped {
-			gb.updateTimer(4)
-
-			if gb.halted {
-				gb.graphics.updateGraphics(4)
-				if gb.handleInterrupts() {
-					gb.halted = false
-				}
-
-			}
-
-			if gb.stopped {
-				if gb.handleInput() {
-					gb.stopped = false
-				}
-			}
-
-			continue
-		}
-
-		oldPC := gb.reg.PC
-		instrLength, name := gb.executeInstruction()
-
-		if gb.interruptEnableScheduled {
-			gb.interruptEnableScheduled = false
-			gb.interruptMaster = true
-		} else if gb.interruptDisableScheduled {
-			gb.interruptDisableScheduled = false
-			gb.interruptMaster = false
-		}
-
-		if name == "DI" {
-			gb.interruptDisableScheduled = true
-		} else if name == "EI" {
-			gb.interruptEnableScheduled = true
-		} else if name == "RETI" {
-			gb.interruptMaster = true
-		} else if name == "HALT" {
-			gb.halted = true
-		} else if name == "stop" {
-			gb.stopped = true
-		}
-
-		gb.updateTimer(instrLength)
-		gb.graphics.updateGraphics(instrLength)
+func (gb *gameboy) Step() {
+	if gb.halted {
+		gb.updateTimer(4)
+		gb.graphics.updateGraphics(4)
 		if gb.handleInterrupts() {
 			gb.halted = false
 		}
-		gb.handleInput()
 
-		// Swap out the boot rom
-		if oldPC == 0xfe && !gb.bootromSwapped {
-			gb.mem.swapBootRom(gb.cartridge)
-			gb.bootromSwapped = true
-		}
+		return
+	}
+
+	oldPC := gb.reg.PC
+	instrLength, name := gb.executeInstruction()
+
+	if gb.interruptEnableScheduled {
+		gb.interruptEnableScheduled = false
+		gb.interruptMaster = true
+	} else if gb.interruptDisableScheduled {
+		gb.interruptDisableScheduled = false
+		gb.interruptMaster = false
+	}
+
+	if name == "DI" {
+		gb.interruptDisableScheduled = true
+	} else if name == "EI" {
+		gb.interruptEnableScheduled = true
+	} else if name == "RETI" {
+		gb.interruptMaster = true
+	} else if name == "HALT" {
+		gb.halted = true
+	}
+
+	gb.updateTimer(instrLength)
+	gb.graphics.updateGraphics(instrLength)
+	if gb.handleInterrupts() {
+		gb.halted = false
+	}
+
+	// Swap out the boot rom
+	if oldPC == 0xFE && !gb.bootromSwapped {
+		gb.mem.swapBootRom(gb.cartridge)
+		gb.bootromSwapped = true
 	}
 }
 
@@ -185,66 +95,7 @@ func (gb *gameboy) updateTimer(cycles int) {
 	}
 }
 
-func (gb *gameboy) handleInput() bool {
-	event := sdl.PollEvent()
-	switch t := event.(type) {
-	case *sdl.KeyboardEvent:
-		switch t.Keysym.Sym {
-		case sdl.K_a:
-			if t.Type == sdl.KEYDOWN {
-				gb.input.A = true
-			} else {
-				gb.input.A = false
-			}
-		case sdl.K_b:
-			if t.Type == sdl.KEYDOWN {
-				gb.input.B = true
-			} else {
-				gb.input.B = false
-			}
-		case sdl.K_LEFT:
-			if t.Type == sdl.KEYDOWN {
-				gb.input.LEFT = true
-			} else {
-				gb.input.LEFT = false
-			}
-		case sdl.K_RIGHT:
-			if t.Type == sdl.KEYDOWN {
-				gb.input.RIGHT = true
-			} else {
-				gb.input.RIGHT = false
-			}
-		case sdl.K_UP:
-			if t.Type == sdl.KEYDOWN {
-				gb.input.UP = true
-			} else {
-				gb.input.UP = false
-			}
-		case sdl.K_DOWN:
-			if t.Type == sdl.KEYDOWN {
-				gb.input.DOWN = true
-			} else {
-				gb.input.DOWN = false
-			}
-		case sdl.K_RETURN:
-			if t.Type == sdl.KEYDOWN {
-				gb.input.ENTER = true
-			} else {
-				gb.input.ENTER = false
-			}
-		case sdl.K_SPACE:
-			if t.Type == sdl.KEYDOWN {
-				gb.input.SPACE = true
-			} else {
-				gb.input.SPACE = false
-			}
-		}
-	}
-
-	return gb.updateJoyReg()
-}
-
-func (gb *gameboy) updateJoyReg() bool {
+func (gb *gameboy) HandleInput(input *Input) bool {
 	joyPadReg := gb.mem.ioPorts[0x00]
 	if !testBit(joyPadReg, 4) && !testBit(joyPadReg, 5) {
 		// Do nothing when input is not polled
@@ -256,43 +107,43 @@ func (gb *gameboy) updateJoyReg() bool {
 	}
 
 	if testBit(joyPadReg, 4) {
-		if gb.input.ENTER {
+		if input.ENTER {
 			joyPadReg = resetBit(joyPadReg, 3)
 		} else {
 			joyPadReg = setBit(joyPadReg, 3)
 		}
-		if gb.input.SPACE {
+		if input.SPACE {
 			joyPadReg = resetBit(joyPadReg, 2)
 		} else {
 			joyPadReg = setBit(joyPadReg, 2)
 		}
-		if gb.input.B {
+		if input.B {
 			joyPadReg = resetBit(joyPadReg, 1)
 		} else {
 			joyPadReg = setBit(joyPadReg, 1)
 		}
-		if gb.input.A {
+		if input.A {
 			joyPadReg = resetBit(joyPadReg, 0)
 		} else {
 			joyPadReg = setBit(joyPadReg, 0)
 		}
 	} else if testBit(joyPadReg, 5) {
-		if gb.input.DOWN {
+		if input.DOWN {
 			joyPadReg = resetBit(joyPadReg, 3)
 		} else {
 			joyPadReg = setBit(joyPadReg, 3)
 		}
-		if gb.input.UP {
+		if input.UP {
 			joyPadReg = resetBit(joyPadReg, 2)
 		} else {
 			joyPadReg = setBit(joyPadReg, 2)
 		}
-		if gb.input.LEFT {
+		if input.LEFT {
 			joyPadReg = resetBit(joyPadReg, 1)
 		} else {
 			joyPadReg = setBit(joyPadReg, 1)
 		}
-		if gb.input.RIGHT {
+		if input.RIGHT {
 			joyPadReg = resetBit(joyPadReg, 0)
 		} else {
 			joyPadReg = setBit(joyPadReg, 0)
