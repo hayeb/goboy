@@ -39,50 +39,56 @@ type Gameboy struct {
 	graphics       *graphics
 	reg            *register
 	options        *Options
+	cartridge      []uint8
+
+	timer *timer
+	input *input
+
+	interruptMaster           bool
+	interruptEnableScheduled  bool
+	interruptDisableScheduled bool
+	halted                    bool
+	stopped                   bool
+	bootromSwapped            bool
 }
 
 func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) *Gameboy {
 	instructionMap := createInstructionMap()
 	cbInstrucionMap := createCBInstructionMap()
 	mem := memInit(cart)
-	graphics := createGraphics(mem.videoRam[:], mem.ioPorts[:], mem.spriteAttribMemory[:], renderer, options.Speed,options.Scaling)
+	graphics := createGraphics(mem.videoRam[:], mem.ioPorts[:], mem.spriteAttribMemory[:], renderer, options.Speed, options.Scaling)
 	registers := new(register)
 	return &Gameboy{
-		cartridgeInfo:  createCartridgeInfo(cart),
-		instructionMap: instructionMap,
-		cbInstruction:  cbInstrucionMap,
-		mem:            mem,
-		graphics:       graphics,
-		reg:            registers,
-		options:        options,
+		cartridgeInfo:   createCartridgeInfo(cart),
+		instructionMap:  instructionMap,
+		cbInstruction:   cbInstrucionMap,
+		mem:             mem,
+		graphics:        graphics,
+		reg:             registers,
+		options:         options,
+		cartridge:       cart,
+		timer:           new(timer),
+		interruptMaster: true,
+		input:           new(input),
 	}
 }
 
-func (gb *Gameboy) Run(cart []uint8, renderer *sdl.Surface) {
-	input := input{}
-
-	interruptMaster := true
-	interruptEnableScheduled := false
-	interruptDisableScheduled := false
-	timer := new(timer)
-	halted := false
-	stopped := false
-	bootromSwapped := false
+func (gb *Gameboy) Run() {
 	for true {
-		if halted || stopped {
-			gb.updateTimer(gb.mem, timer, 4)
+		if gb.halted || gb.stopped {
+			gb.updateTimer(4)
 
-			if halted {
+			if gb.halted {
 				gb.graphics.updateGraphics(4)
-				if gb.handleInterrupts(gb.mem, gb.reg, interruptMaster) {
-					halted = false
+				if gb.handleInterrupts() {
+					gb.halted = false
 				}
 
 			}
 
-			if stopped {
-				if gb.handleInput(&input, gb.mem) {
-					stopped = false
+			if gb.stopped {
+				if gb.handleInput() {
+					gb.stopped = false
 				}
 			}
 
@@ -90,58 +96,58 @@ func (gb *Gameboy) Run(cart []uint8, renderer *sdl.Surface) {
 		}
 
 		oldPC := gb.reg.PC
-		instrLength, name := gb.executeInstruction(gb.mem, gb.reg, gb.instructionMap, gb.cbInstruction)
+		instrLength, name := gb.executeInstruction()
 
-		if interruptEnableScheduled {
-			interruptEnableScheduled = false
-			interruptMaster = true
-		} else if interruptDisableScheduled {
-			interruptDisableScheduled = false
-			interruptMaster = false
+		if gb.interruptEnableScheduled {
+			gb.interruptEnableScheduled = false
+			gb.interruptMaster = true
+		} else if gb.interruptDisableScheduled {
+			gb.interruptDisableScheduled = false
+			gb.interruptMaster = false
 		}
 
 		if name == "DI" {
-			interruptDisableScheduled = true
+			gb.interruptDisableScheduled = true
 		} else if name == "EI" {
-			interruptEnableScheduled = true
+			gb.interruptEnableScheduled = true
 		} else if name == "RETI" {
-			interruptMaster = true
+			gb.interruptMaster = true
 		} else if name == "HALT" {
-			halted = true
+			gb.halted = true
 		} else if name == "stop" {
-			stopped = true
+			gb.stopped = true
 		}
 
-		gb.updateTimer(gb.mem, timer, instrLength)
+		gb.updateTimer(instrLength)
 		gb.graphics.updateGraphics(instrLength)
-		if gb.handleInterrupts(gb.mem, gb.reg, interruptMaster) {
-			halted = false
+		if gb.handleInterrupts() {
+			gb.halted = false
 		}
-		gb.handleInput(&input, gb.mem)
+		gb.handleInput()
 
 		// Swap out the boot rom
-		if oldPC == 0xfe && !bootromSwapped {
-			gb.mem.swapBootRom(cart)
-			bootromSwapped = true
+		if oldPC == 0xfe && !gb.bootromSwapped {
+			gb.mem.swapBootRom(gb.cartridge)
+			gb.bootromSwapped = true
 		}
 	}
 }
 
-func (gb *Gameboy) updateTimer(mem *memory, timer *timer, cycles int) {
-	timer.t += cycles
+func (gb *Gameboy) updateTimer(cycles int) {
+	gb.timer.t += cycles
 
-	if timer.t >= 16 {
-		timer.m++
-		timer.t -= 16
-		timer.d++
-		if timer.d == 16 {
-			timer.d = 0
-			val := mem.ioPorts[0x04]
-			mem.ioPorts[0x04] = val + 1
+	if gb.timer.t >= 16 {
+		gb.timer.m++
+		gb.timer.t -= 16
+		gb.timer.d++
+		if gb.timer.d == 16 {
+			gb.timer.d = 0
+			val := gb.mem.ioPorts[0x04]
+			gb.mem.ioPorts[0x04] = val + 1
 		}
 	}
 
-	tac := mem.ioPorts[0x07]
+	tac := gb.mem.ioPorts[0x07]
 
 	// If the timer is turned on,
 	t := 0
@@ -158,126 +164,126 @@ func (gb *Gameboy) updateTimer(mem *memory, timer *timer, cycles int) {
 			t = 16
 		}
 
-		if timer.m >= t {
-			timer.m = 0
-			mem.ioPorts[0x05]++
+		if gb.timer.m >= t {
+			gb.timer.m = 0
+			gb.mem.ioPorts[0x05]++
 
-			if mem.ioPorts[0x05] == 0 {
-				mem.ioPorts[0x05] = mem.ioPorts[0x06]
-				mem.ioPorts[0x0F] |= 0x4
+			if gb.mem.ioPorts[0x05] == 0 {
+				gb.mem.ioPorts[0x05] = gb.mem.ioPorts[0x06]
+				gb.mem.ioPorts[0x0F] |= 0x4
 			}
 		}
 	}
 }
 
-func (gb *Gameboy) handleInput(input *input, mem *memory) bool {
+func (gb *Gameboy) handleInput() bool {
 	event := sdl.PollEvent()
 	switch t := event.(type) {
 	case *sdl.KeyboardEvent:
 		switch t.Keysym.Sym {
 		case sdl.K_a:
 			if t.Type == sdl.KEYDOWN {
-				input.A = true
+				gb.input.A = true
 			} else {
-				input.A = false
+				gb.input.A = false
 			}
 		case sdl.K_b:
 			if t.Type == sdl.KEYDOWN {
-				input.B = true
+				gb.input.B = true
 			} else {
-				input.B = false
+				gb.input.B = false
 			}
 		case sdl.K_LEFT:
 			if t.Type == sdl.KEYDOWN {
-				input.LEFT = true
+				gb.input.LEFT = true
 			} else {
-				input.LEFT = false
+				gb.input.LEFT = false
 			}
 		case sdl.K_RIGHT:
 			if t.Type == sdl.KEYDOWN {
-				input.RIGHT = true
+				gb.input.RIGHT = true
 			} else {
-				input.RIGHT = false
+				gb.input.RIGHT = false
 			}
 		case sdl.K_UP:
 			if t.Type == sdl.KEYDOWN {
-				input.UP = true
+				gb.input.UP = true
 			} else {
-				input.UP = false
+				gb.input.UP = false
 			}
 		case sdl.K_DOWN:
 			if t.Type == sdl.KEYDOWN {
-				input.DOWN = true
+				gb.input.DOWN = true
 			} else {
-				input.DOWN = false
+				gb.input.DOWN = false
 			}
 		case sdl.K_RETURN:
 			if t.Type == sdl.KEYDOWN {
-				input.ENTER = true
+				gb.input.ENTER = true
 			} else {
-				input.ENTER = false
+				gb.input.ENTER = false
 			}
 		case sdl.K_SPACE:
 			if t.Type == sdl.KEYDOWN {
-				input.SPACE = true
+				gb.input.SPACE = true
 			} else {
-				input.SPACE = false
+				gb.input.SPACE = false
 			}
 		}
 	}
 
-	return gb.updateJoyReg(input, mem)
+	return gb.updateJoyReg()
 }
 
-func (gb *Gameboy) updateJoyReg(input *input, mem *memory) bool {
-	joyPadReg := mem.ioPorts[0x00]
+func (gb *Gameboy) updateJoyReg() bool {
+	joyPadReg := gb.mem.ioPorts[0x00]
 	if !testBit(joyPadReg, 4) && !testBit(joyPadReg, 5) {
 		// Do nothing when input is not polled
 		return false
 	} else if testBit(joyPadReg, 4) && testBit(joyPadReg, 5) {
 		// Reset the register
-		mem.write8(0xFF00, 0xf)
+		gb.mem.write8(0xFF00, 0xf)
 		return false
 	}
 
 	if testBit(joyPadReg, 4) {
-		if input.ENTER {
+		if gb.input.ENTER {
 			joyPadReg = resetBit(joyPadReg, 3)
 		} else {
 			joyPadReg = setBit(joyPadReg, 3)
 		}
-		if input.SPACE {
+		if gb.input.SPACE {
 			joyPadReg = resetBit(joyPadReg, 2)
 		} else {
 			joyPadReg = setBit(joyPadReg, 2)
 		}
-		if input.B {
+		if gb.input.B {
 			joyPadReg = resetBit(joyPadReg, 1)
 		} else {
 			joyPadReg = setBit(joyPadReg, 1)
 		}
-		if input.A {
+		if gb.input.A {
 			joyPadReg = resetBit(joyPadReg, 0)
 		} else {
 			joyPadReg = setBit(joyPadReg, 0)
 		}
 	} else if testBit(joyPadReg, 5) {
-		if input.DOWN {
+		if gb.input.DOWN {
 			joyPadReg = resetBit(joyPadReg, 3)
 		} else {
 			joyPadReg = setBit(joyPadReg, 3)
 		}
-		if input.UP {
+		if gb.input.UP {
 			joyPadReg = resetBit(joyPadReg, 2)
 		} else {
 			joyPadReg = setBit(joyPadReg, 2)
 		}
-		if input.LEFT {
+		if gb.input.LEFT {
 			joyPadReg = resetBit(joyPadReg, 1)
 		} else {
 			joyPadReg = setBit(joyPadReg, 1)
 		}
-		if input.RIGHT {
+		if gb.input.RIGHT {
 			joyPadReg = resetBit(joyPadReg, 0)
 		} else {
 			joyPadReg = setBit(joyPadReg, 0)
@@ -287,22 +293,22 @@ func (gb *Gameboy) updateJoyReg(input *input, mem *memory) bool {
 	joyPadReg = resetBit(joyPadReg, 4)
 	joyPadReg = resetBit(joyPadReg, 5)
 
-	mem.ioPorts[0x00] = joyPadReg
+	gb.mem.ioPorts[0x00] = joyPadReg
 
 	return joyPadReg < 0xf
 }
 
-func (gb *Gameboy) handleInterrupts(mem *memory, reg *register, master bool) bool {
-	if !master {
+func (gb *Gameboy) handleInterrupts() bool {
+	if !gb.interruptMaster {
 		return false
 	}
-	req := mem.read8(0xff0f)
-	enabled := mem.read8(0xffff)
+	req := gb.mem.read8(0xff0f)
+	enabled := gb.mem.read8(0xffff)
 	handled := false
 	if req > 0 {
 		for i := 0; i < 5; i += 1 {
 			if testBit(req, uint(i)) && testBit(enabled, uint(i)) {
-				gb.serviceInterrupt(mem, reg, i, req)
+				gb.serviceInterrupt(i, req)
 				handled = true
 			}
 		}
@@ -310,55 +316,55 @@ func (gb *Gameboy) handleInterrupts(mem *memory, reg *register, master bool) boo
 	return handled
 }
 
-func (gb *Gameboy) serviceInterrupt(mem *memory, reg *register, i int, requested uint8) {
-	mem.write8(0xff0f, resetBit(requested, uint(i)))
-	pushStack16(mem, reg, reg.PC)
+func (gb *Gameboy) serviceInterrupt(i int, requested uint8) {
+	gb.mem.write8(0xff0f, resetBit(requested, uint(i)))
+	pushStack16(gb.mem, gb.reg, gb.reg.PC)
 
 	switch i {
 	case 0:
-		reg.PC = 0x40
+		gb.reg.PC = 0x40
 	case 1:
 		fmt.Println("Servicing LCD interrupt")
-		reg.PC = 0x48
+		gb.reg.PC = 0x48
 	case 2:
-		reg.PC = 0x50
+		gb.reg.PC = 0x50
 	case 4:
 		fmt.Println("Servicing JOYPAD interrupt")
-		reg.PC = 0x60
+		gb.reg.PC = 0x60
 	default:
 		panic(fmt.Sprintf("Servicing unknown interupt %d", i))
 	}
 }
 
 // Executes the next instruction at the PC. Returns the length (in cycles) of the instruction
-func (gb *Gameboy) executeInstruction(mem *memory, reg *register, instrMap *map[uint8]*instruction, cbInstrMap *map[uint8]*cbInstruction) (int, string) {
-	instructionCode := mem.read8(reg.PC)
-	instr, ok := (*instrMap)[instructionCode]
+func (gb *Gameboy) executeInstruction() (int, string) {
+	instructionCode := gb.mem.read8(gb.reg.PC)
+	instr, ok := (*gb.instructionMap)[instructionCode]
 
 	if !ok {
 		//spew.Dump(mem.videoRam)
-		panic(fmt.Sprintf("Unrecognized instruction %#02x at address %#04x", instructionCode, reg.PC))
+		panic(fmt.Sprintf("Unrecognized instruction %#02x at address %#04x", instructionCode, gb.reg.PC))
 	}
 
 	if instr.name != "CB" {
 		if gb.options.Debug {
-			fmt.Printf("%#04x\t%s\n", reg.PC, instr.name)
+			fmt.Printf("%#04x\t%s\n", gb.reg.PC, instr.name)
 		}
 
-		cycles := instr.executor(mem, reg, instr)
+		cycles := instr.executor(gb.mem, gb.reg, instr)
 
 		return cycles, instr.name
 	} else {
-		cbCode := mem.read8(reg.PC + 1)
-		cb, ok := (*cbInstrMap)[cbCode]
+		cbCode := gb.mem.read8(gb.reg.PC + 1)
+		cb, ok := (*gb.cbInstruction)[cbCode]
 		if !ok {
-			panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, reg.PC))
+			panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, gb.reg.PC))
 		}
 		if gb.options.Debug {
-			fmt.Printf("%#04x\t%s %s\n", reg.PC, instr.name, cb.name)
+			fmt.Printf("%#04x\t%s %s\n", gb.reg.PC, instr.name, cb.name)
 		}
 
-		cycles := cb.executor(mem, reg, cb)
+		cycles := cb.executor(gb.mem, gb.reg, cb)
 		return cycles + 4, cb.name
 	}
 }

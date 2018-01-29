@@ -51,5 +51,5 @@ func main() {
 	sdl.JoystickEventState(sdl.DISABLE)
 
 	gb := gameboy.Initialize(cartridge, window, &gameboy.Options{Scaling: *scale, Debug: *debug, Speed: *speed})
-	gb.Run(cartridge, window)
+	gb.Run()
 }

@@ -338,7 +338,6 @@ func (memory *memory) requestInterupt(interruptType int) {
 }
 
 func (memory *memory) swapBootRom(cartridge []uint8) {
-	fmt.Println("Swapping out bootrom")
 	for i := 0; i < 0x100; i += 1 {
 		memory.bank0[i] = cartridge[i]
 	}
