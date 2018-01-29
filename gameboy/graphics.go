@@ -194,6 +194,10 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 	// TODO: Handle switching set #0, #1
 	var tileMapAddress uint16 = 0x1800
 
+	if testBit(graphics.ioPorts[LCDC], 5) {
+		panic("Displaying window not yet implemented")
+	}
+
 	if testBit(graphics.ioPorts[LCDC], 3) {
 		tileMapAddress = 0x1C00
 	}
@@ -214,7 +218,11 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 	// there are 8 pixels width in a tile
 	var offsetInLine = scX / 8
 
-	tileNumber := graphics.videoRam[tileMapAddress+offsetInLine]
+	var tileNumber int = int(graphics.videoRam[tileMapAddress+offsetInLine])
+
+	if !testBit(graphics.ioPorts[LCDC], 4) {
+		tileNumber += 256
+	}
 	for i := 0; i < 160; i++ {
 		var dataAddr = uint16(tileNumber)*16 + uint16(y*2)
 
@@ -235,7 +243,10 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 		if x == 8 {
 			x = 0
 			offsetInLine = offsetInLine + 1
-			tileNumber = graphics.videoRam[tileMapAddress+offsetInLine]
+			tileNumber = int(graphics.videoRam[tileMapAddress+offsetInLine])
+			if !testBit(graphics.ioPorts[LCDC], 4) {
+				tileNumber += 256
+			}
 		}
 	}
 }

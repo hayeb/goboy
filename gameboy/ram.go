@@ -178,6 +178,8 @@ func (memory *memory) read16(address uint16) uint16 {
 		return uint16(memory.internalRam8kb[address-0xC000]) | uint16(memory.internalRam8kb[address-0xC000+1]) << 8
 	case ioPorts:
 		return uint16(memory.ioPorts[address-0xff00]) | (uint16(memory.ioPorts[address-0xff00+1]) << 8)
+	case internalRam:
+		return uint16(memory.internalRam[address-0xFF80]) | (uint16(memory.internalRam[address-0xFF80+1]) << 8)
 	default:
 		panic(fmt.Sprintf("Read halfword requested unimplemented memory: %x", address))
 	}

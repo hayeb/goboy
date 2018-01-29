@@ -25,6 +25,7 @@ func createInstructionMap() *map[uint8]*instruction {
 	return &map[uint8]*instruction{
 		0x00: newInstruction("NOOP", 1, 4, noop),
 		0x01: newInstruction("LD BC,d16", 3, 12, ldBCnn),
+		0x02: newInstruction("LD (BC),A", 1, 8, ldBCA),
 		0x03: newInstruction("INC BC", 1, 8, incBC),
 		0x04: newInstruction("INC B", 1, 4, incB),
 		0x05: newInstruction("DEC B", 1, 4, decB),
@@ -170,7 +171,7 @@ func createInstructionMap() *map[uint8]*instruction {
 
 		0xd0: newConditionalInstruction("RET NC", 1, 20, 8, retNC),
 		0xd1: newInstruction("POP DE", 1, 12, popDe),
-		0xd2: newConditionalInstruction("JP NC,a16",3, 16,12, jpNcA16),
+		0xd2: newConditionalInstruction("JP NC,a16", 3, 16, 12, jpNcA16),
 		0xd5: newInstruction("PUSH DE", 1, 16, pushDe),
 		0xd6: newInstruction("SUB d8", 2, 8, subD8),
 		0xd8: newConditionalInstruction("RET C", 1, 20, 8, retC),
@@ -1546,6 +1547,13 @@ func daa(_ *memory, reg *register, instr *instruction) int {
 	if val > 0xff {
 		reg.Flag.C = true
 	}
+
+	reg.incPC(instr.bytes)
+	return instr.durationAction
+}
+
+func ldBCA(mem *memory, reg *register, instr *instruction) int {
+	mem.write8(reg.readDuo(REG_HL), reg.A)
 
 	reg.incPC(instr.bytes)
 	return instr.durationAction
