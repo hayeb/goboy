@@ -31,7 +31,7 @@ type Options struct {
 	Speed   int
 }
 
-type Gameboy struct {
+type gameboy struct {
 	cartridgeInfo  *cartridgeInfo
 	instructionMap *map[uint8]*instruction
 	cbInstruction  *map[uint8]*cbInstruction
@@ -52,14 +52,20 @@ type Gameboy struct {
 	bootromSwapped            bool
 }
 
-func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) *Gameboy {
+type IGameboy interface {
+	Run()
+}
+
+func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) IGameboy {
 	instructionMap := createInstructionMap()
 	cbInstrucionMap := createCBInstructionMap()
 	mem := memInit(cart)
 	graphics := createGraphics(mem.videoRam[:], mem.ioPorts[:], mem.spriteAttribMemory[:], renderer, options.Speed, options.Scaling)
 	registers := new(register)
-	return &Gameboy{
-		cartridgeInfo:   createCartridgeInfo(cart),
+	cartInfo := createCartridgeInfo(cart)
+
+	gameboy := gameboy{
+		cartridgeInfo:   cartInfo,
 		instructionMap:  instructionMap,
 		cbInstruction:   cbInstrucionMap,
 		mem:             mem,
@@ -71,9 +77,12 @@ func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) *Gameboy 
 		interruptMaster: true,
 		input:           new(input),
 	}
+
+	fmt.Printf("Initialized:\n%s", cartridgeInfoString(*cartInfo))
+	return &gameboy
 }
 
-func (gb *Gameboy) Run() {
+func (gb *gameboy) Run() {
 	for true {
 		if gb.halted || gb.stopped {
 			gb.updateTimer(4)
@@ -133,7 +142,7 @@ func (gb *Gameboy) Run() {
 	}
 }
 
-func (gb *Gameboy) updateTimer(cycles int) {
+func (gb *gameboy) updateTimer(cycles int) {
 	gb.timer.t += cycles
 
 	if gb.timer.t >= 16 {
@@ -176,7 +185,7 @@ func (gb *Gameboy) updateTimer(cycles int) {
 	}
 }
 
-func (gb *Gameboy) handleInput() bool {
+func (gb *gameboy) handleInput() bool {
 	event := sdl.PollEvent()
 	switch t := event.(type) {
 	case *sdl.KeyboardEvent:
@@ -235,7 +244,7 @@ func (gb *Gameboy) handleInput() bool {
 	return gb.updateJoyReg()
 }
 
-func (gb *Gameboy) updateJoyReg() bool {
+func (gb *gameboy) updateJoyReg() bool {
 	joyPadReg := gb.mem.ioPorts[0x00]
 	if !testBit(joyPadReg, 4) && !testBit(joyPadReg, 5) {
 		// Do nothing when input is not polled
@@ -298,12 +307,12 @@ func (gb *Gameboy) updateJoyReg() bool {
 	return joyPadReg < 0xf
 }
 
-func (gb *Gameboy) handleInterrupts() bool {
+func (gb *gameboy) handleInterrupts() bool {
 	if !gb.interruptMaster {
 		return false
 	}
-	req := gb.mem.read8(0xff0f)
-	enabled := gb.mem.read8(0xffff)
+	req := gb.mem.read8(0xFF0F)
+	enabled := gb.mem.read8(0xFFFF)
 	handled := false
 	if req > 0 {
 		for i := 0; i < 5; i += 1 {
@@ -316,7 +325,7 @@ func (gb *Gameboy) handleInterrupts() bool {
 	return handled
 }
 
-func (gb *Gameboy) serviceInterrupt(i int, requested uint8) {
+func (gb *gameboy) serviceInterrupt(i int, requested uint8) {
 	gb.mem.write8(0xff0f, resetBit(requested, uint(i)))
 	pushStack16(gb.mem, gb.reg, gb.reg.PC)
 
@@ -337,7 +346,7 @@ func (gb *Gameboy) serviceInterrupt(i int, requested uint8) {
 }
 
 // Executes the next instruction at the PC. Returns the length (in cycles) of the instruction
-func (gb *Gameboy) executeInstruction() (int, string) {
+func (gb *gameboy) executeInstruction() (int, string) {
 	instructionCode := gb.mem.read8(gb.reg.PC)
 	instr, ok := (*gb.instructionMap)[instructionCode]
 

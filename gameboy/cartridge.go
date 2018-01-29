@@ -66,15 +66,15 @@ const (
 type gameBoyType int
 
 const (
-	gameboy gameBoyType = iota
-	super_gameboy
+	type_gameboy gameBoyType = iota
+	type_super_gameboy
 )
 
 func (cartInfo *cartridgeInfo) gameboyTypeString() string {
 	switch cartInfo.System {
-	case gameboy:
+	case type_gameboy:
 		return "Gameboy"
-	case super_gameboy:
+	case type_super_gameboy:
 		return "Super Gameboy"
 	default:
 		return ""
@@ -173,9 +173,9 @@ func (cartInfo *cartridgeInfo) ramSizeCodeString() string {
 func gameboyType(typeCode uint8) gameBoyType {
 	switch typeCode {
 	case 0x00:
-		return gameboy
+		return type_gameboy
 	case 0x03:
-		return super_gameboy
+		return type_super_gameboy
 	default:
 		panic(fmt.Sprintf("Unknown system typecode %d", typeCode))
 	}
