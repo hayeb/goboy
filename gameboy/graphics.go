@@ -2,24 +2,30 @@ package gameboy
 
 import (
 	"github.com/banthar/Go-SDL/sdl"
-	"fmt"
 )
 
 const (
-	ADDRESS_IO_PORTS  = 0xFF00
-	ADDRESS_VIDEO_RAM = 0x8000
+	ADDRESS_IO_PORTS = 0xFF00
 
-	LCDC      uint16 = 0xFF40 - ADDRESS_IO_PORTS
-	LCDC_STAT uint16 = 0xFF41 - ADDRESS_IO_PORTS
-	SCROLL_Y  uint16 = 0xFF42 - ADDRESS_IO_PORTS
-	SCROLL_X  uint16 = 0xFF43 - ADDRESS_IO_PORTS
-	SCANLINE  uint16 = 0xFF44 - ADDRESS_IO_PORTS
+	LCDC     uint16 = 0xFF40 - ADDRESS_IO_PORTS
+	SCROLL_Y uint16 = 0xFF42 - ADDRESS_IO_PORTS
+	SCROLL_X uint16 = 0xFF43 - ADDRESS_IO_PORTS
+	SCANLINE uint16 = 0xFF44 - ADDRESS_IO_PORTS
+	BGP      uint16 = 0xFF47 - ADDRESS_IO_PORTS
+	OBP0     uint16 = 0xFF48 - ADDRESS_IO_PORTS
+	OBP1     uint16 = 0xFF49 - ADDRESS_IO_PORTS
+	IF       uint16 = 0xFF0F - ADDRESS_IO_PORTS
 )
 
 type graphics struct {
-	memory        *memory
-	renderer      *sdl.Surface
-	cartridgeInfo *cartridgeInfo
+	videoRam              []uint8
+	ioPorts               []uint8
+	spriteAttributeMemory []uint8
+
+	renderer *sdl.Surface
+
+	scaling int
+	speed   int
 
 	screen [144][160]drawColor
 
@@ -34,18 +40,21 @@ type drawColor struct {
 	b uint8
 }
 
-func createGraphics(mem *memory, rend *sdl.Surface, ci *cartridgeInfo) *graphics {
+func createGraphics(videoRam []uint8, ioPorts []uint8, spriteAttributeMemory []uint8, rend *sdl.Surface, speed int, scale int) *graphics {
 	return &graphics{
-		memory:        mem,
-		renderer:      rend,
-		cartridgeInfo: ci,
+		videoRam: videoRam,
+		ioPorts:  ioPorts,
+		spriteAttributeMemory: spriteAttributeMemory,
+		renderer: rend,
+		scaling:  scale,
+		speed:    speed,
 	}
 }
 
 func (graphics *graphics) updateGraphics(instructionLength int) {
 	graphics.modeclock += instructionLength
 
-	graphics.memory.ioPorts[SCANLINE] = graphics.line
+	graphics.ioPorts[SCANLINE] = graphics.line
 
 	// TODO: Write the LCD status to memory
 	switch graphics.mode {
@@ -59,7 +68,7 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 			if graphics.line == 144 {
 				graphics.mode = 1
 				graphics.showData()
-				graphics.memory.write8(0xff0f, setBit(graphics.memory.read8(0xff0f), 0))
+				graphics.ioPorts[IF] = setBit(graphics.ioPorts[IF], 0)
 			} else {
 				graphics.mode = 2
 			}
@@ -94,7 +103,7 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 Draws current line to the screen buffer
  */
 func (graphics *graphics) drawCurrentLine() {
-	lcdc := graphics.memory.read8(0xFF40)
+	lcdc := graphics.ioPorts[LCDC]
 	if !testBit(lcdc, 7) {
 		return
 	}
@@ -110,20 +119,17 @@ func (graphics *graphics) drawCurrentLine() {
 }
 
 func (graphics *graphics) drawSprites(background *[160]uint8) {
-	var mem = graphics.memory
-
 	bytesInSprite := uint16(16)
-	if testBit(mem.read8(0xFF40), 2) {
-		fmt.Println("8*16")
+	if testBit(graphics.ioPorts[LCDC], 2) {
 		bytesInSprite = 32
 	}
 	for i := uint16(0); i < 40; i++ {
 		var address = i * 4
 
 		// Y top left on screen
-		y := mem.spriteAttribMemory[address] - 16
+		y := graphics.spriteAttributeMemory[address] - 16
 		// X top left on screen
-		x := mem.spriteAttribMemory[address+1] - 8
+		x := graphics.spriteAttributeMemory[address+1] - 8
 
 		// Should we draw a line in the current sprite?
 		if y > graphics.line || graphics.line >= y+8 {
@@ -131,10 +137,10 @@ func (graphics *graphics) drawSprites(background *[160]uint8) {
 		}
 
 		// Tile number
-		tileNumber := mem.spriteAttribMemory[address+2]
+		tileNumber := graphics.spriteAttributeMemory[address+2]
 
 		// Several options for this sprite
-		spriteFlags := mem.spriteAttribMemory[address+3]
+		spriteFlags := graphics.spriteAttributeMemory[address+3]
 
 		lineNumber := uint16(graphics.line - y)
 
@@ -149,8 +155,8 @@ func (graphics *graphics) drawSprites(background *[160]uint8) {
 				continue
 			}
 			//
-			lowerByte := mem.videoRam[rowAddress]
-			higherByte := mem.videoRam[rowAddress+1]
+			lowerByte := graphics.videoRam[rowAddress]
+			higherByte := graphics.videoRam[rowAddress+1]
 
 			var rowShift = 7 - j
 			if testBit(spriteFlags, 5) {
@@ -166,9 +172,9 @@ func (graphics *graphics) drawSprites(background *[160]uint8) {
 				continue
 			}
 
-			paletteAddress := uint16(0xFF48)
+			paletteAddress := OBP0
 			if testBit(spriteFlags, 4) {
-				paletteAddress++
+				paletteAddress = OBP1
 			}
 
 			priority := testBit(spriteFlags, 7)
@@ -185,15 +191,16 @@ func (graphics *graphics) drawSprites(background *[160]uint8) {
 
 func (graphics *graphics) drawBackground(background *[160]uint8) {
 	// TODO: Draw window
+	// TODO: Handle switching set #0, #1
 	var tileMapAddress uint16 = 0x1800
 
-	if testBit(graphics.memory.ioPorts[LCDC], 3) {
+	if testBit(graphics.ioPorts[LCDC], 3) {
 		tileMapAddress = 0x1C00
 	}
 
 	// Where is the screen relative to the background in memory?
-	var scY = uint16(graphics.memory.ioPorts[SCROLL_Y])
-	var scX = uint16(graphics.memory.ioPorts[SCROLL_X])
+	var scY = uint16(graphics.ioPorts[SCROLL_Y])
+	var scX = uint16(graphics.ioPorts[SCROLL_X])
 
 	// We adjust the tilemap address. There are 32*32 tiles total in the background,
 	// and every tile has 8 lines.
@@ -207,12 +214,12 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 	// there are 8 pixels width in a tile
 	var offsetInLine = scX / 8
 
-	tileNumber := graphics.memory.videoRam[tileMapAddress+offsetInLine]
+	tileNumber := graphics.videoRam[tileMapAddress+offsetInLine]
 	for i := 0; i < 160; i++ {
 		var dataAddr = uint16(tileNumber)*16 + uint16(y*2)
 
-		lowerByte := graphics.memory.videoRam[dataAddr]
-		higherByte := graphics.memory.videoRam[dataAddr+1]
+		lowerByte := graphics.videoRam[dataAddr]
+		higherByte := graphics.videoRam[dataAddr+1]
 
 		// The tile are lain out in memory as you would expect, so
 		// the 7th bit in a line is the left-most pixel
@@ -221,14 +228,14 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 
 		colorByte := higherBit<<1 | lowerBit
 
-		graphics.screen[graphics.line][i] = graphics.getColor(colorByte, 0xff47)
+		graphics.screen[graphics.line][i] = graphics.getColor(colorByte, BGP)
 		background[i] = colorByte
 
 		x++
 		if x == 8 {
 			x = 0
 			offsetInLine = offsetInLine + 1
-			tileNumber = graphics.memory.videoRam[tileMapAddress+offsetInLine]
+			tileNumber = graphics.videoRam[tileMapAddress+offsetInLine]
 		}
 	}
 }
@@ -236,7 +243,7 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 func (graphics *graphics) showData() {
 	for j := 0; j < len(graphics.screen); j++ {
 		for i := 0; i < len(graphics.screen[0]); i++ {
-			rect := sdl.Rect{X: int16(i * 4), Y: int16(j * 4), W: 4, H: 4}
+			rect := sdl.Rect{X: int16(i * graphics.scaling), Y: int16(j * graphics.scaling), W: uint16(graphics.scaling), H: uint16(graphics.scaling)}
 			graphics.renderer.FillRect(&rect, sdl.MapRGBA(graphics.renderer.Format, graphics.screen[j][i].r, graphics.screen[j][i].g, graphics.screen[j][i].b, 0xff))
 		}
 	}
@@ -244,11 +251,11 @@ func (graphics *graphics) showData() {
 }
 
 func (graphics *graphics) isLCDEnabled() bool {
-	return testBit(graphics.memory.read8(0xff40), 7)
+	return testBit(graphics.ioPorts[0x40], 7)
 }
 
 func (graphics *graphics) getColor(colorByte uint8, paletteAddress uint16) drawColor {
-	palette := graphics.memory.read8(paletteAddress)
+	palette := graphics.ioPorts[paletteAddress]
 
 	colorNo := (palette >> (colorByte * 2)) & 0x3
 

@@ -27,8 +27,8 @@ type timer struct {
 
 type Options struct {
 	Scaling int
-	Debug bool
-	Speed int
+	Debug   bool
+	Speed   int
 }
 
 type Gameboy struct {
@@ -38,22 +38,23 @@ type Gameboy struct {
 	mem            *memory
 	graphics       *graphics
 	reg            *register
+	options        *Options
 }
 
-func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) *Gameboy{
-	cartridgeInfo := createCartridgeInfo(cart)
+func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) *Gameboy {
 	instructionMap := createInstructionMap()
 	cbInstrucionMap := createCBInstructionMap()
 	mem := memInit(cart)
-	graphics := createGraphics(mem, renderer, cartridgeInfo)
+	graphics := createGraphics(mem.videoRam[:], mem.ioPorts[:], mem.spriteAttribMemory[:], renderer, options.Speed,options.Scaling)
 	registers := new(register)
 	return &Gameboy{
-		cartridgeInfo: cartridgeInfo,
-		instructionMap:instructionMap,
-		cbInstruction:cbInstrucionMap,
-		mem:mem,
-		graphics:graphics,
-		reg:registers,
+		cartridgeInfo:  createCartridgeInfo(cart),
+		instructionMap: instructionMap,
+		cbInstruction:  cbInstrucionMap,
+		mem:            mem,
+		graphics:       graphics,
+		reg:            registers,
+		options:        options,
 	}
 }
 
