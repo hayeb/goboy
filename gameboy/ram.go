@@ -220,17 +220,12 @@ func (memory *memory) write8(address uint16, val uint8) {
 func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 	switch address {
 	case 0xFF40:
-		fmt.Printf("Writing to LCDC: %b\n", val)
 		memory.ioPorts[0x40] = val
 		return true
 	case 0xFF44:
 		// Reset the scanline to 0
-		fmt.Println("Resetting scanline register 0xff44 to 0")
 		memory.ioPorts[0x44] = 0
 		return true
-	case 0xFF45:
-		fmt.Printf("Writing to LYC: %#04x\n", val)
-		return false
 	case 0xFF46:
 		for i := 0; i < 0xA0; i++ {
 			memory.spriteAttribMemory[i] = memory.read8(uint16(val)*0x100 + uint16(i))

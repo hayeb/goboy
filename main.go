@@ -11,7 +11,8 @@ import (
 
 func check(e error) {
 	if e != nil {
-		panic(e)
+		fmt.Println(e.Error())
+		os.Exit(1)
 	}
 }
 
@@ -24,8 +25,9 @@ func main() {
 
 	flag.Parse()
 
-	if rom == nil {
+	if rom == nil || *rom == ""{
 		fmt.Println("Please specify a rom using -rom")
+		os.Exit(1)
 	}
 
 	if *scale <= 0 {
@@ -45,6 +47,7 @@ func main() {
 	sdl.Init(sdl.INIT_EVERYTHING)
 
 	window := sdl.SetVideoMode(*scale*160, *scale*144, 32, sdl.HWACCEL)
+	defer window.Free()
 	sdl.JoystickEventState(sdl.DISABLE)
 
 	gb := gameboy.Initialize(cartridge, window, &gameboy.Options{Scaling: *scale, Debug: *debug, Speed: *speed})
