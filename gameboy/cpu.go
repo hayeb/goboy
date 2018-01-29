@@ -25,8 +25,39 @@ type timer struct {
 	d int
 }
 
-func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
-	_, mem, reg, instrMap, cbInstrMap, graphics := initializeSystem(cart, bootrom, renderer)
+type Options struct {
+	Scaling int
+	Debug bool
+	Speed int
+}
+
+type Gameboy struct {
+	cartridgeInfo  *cartridgeInfo
+	instructionMap *map[uint8]*instruction
+	cbInstruction  *map[uint8]*cbInstruction
+	mem            *memory
+	graphics       *graphics
+	reg            *register
+}
+
+func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) *Gameboy{
+	cartridgeInfo := createCartridgeInfo(cart)
+	instructionMap := createInstructionMap()
+	cbInstrucionMap := createCBInstructionMap()
+	mem := memInit(cart)
+	graphics := createGraphics(mem, renderer, cartridgeInfo)
+	registers := new(register)
+	return &Gameboy{
+		cartridgeInfo: cartridgeInfo,
+		instructionMap:instructionMap,
+		cbInstruction:cbInstrucionMap,
+		mem:mem,
+		graphics:graphics,
+		reg:registers,
+	}
+}
+
+func (gb *Gameboy) Run(cart []uint8, renderer *sdl.Surface) {
 	input := input{}
 
 	//if ci.ramSize != ram_none || ci.romSize != rom_kbit_256 {
@@ -41,18 +72,18 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 	bootromSwapped := false
 	for true {
 		if halted || stopped {
-			updateTimer(mem, timer, 4)
+			updateTimer(gb.mem, timer, 4)
 
 			if halted {
-				graphics.updateGraphics(4)
-				if handleInterrupts(mem, reg, interruptMaster) {
+				gb.graphics.updateGraphics(4)
+				if handleInterrupts(gb.mem, gb.reg, interruptMaster) {
 					halted = false
 				}
 
 			}
 
 			if stopped {
-				if handleInput(&input, mem) {
+				if handleInput(&input, gb.mem) {
 					stopped = false
 				}
 			}
@@ -60,13 +91,12 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 			continue
 		}
 
-		oldPC := reg.PC
-		instrLength, name := executeInstruction(mem, reg, instrMap, cbInstrMap)
+		oldPC := gb.reg.PC
+		instrLength, name := executeInstruction(gb.mem, gb.reg, gb.instructionMap, gb.cbInstruction)
 
 		if oldPC == 0x20b {
 			fmt.Println("BREAK!")
 		}
-
 
 		if interruptEnableScheduled {
 			interruptEnableScheduled = false
@@ -88,17 +118,16 @@ func Run(cart []uint8, bootrom []uint8, renderer *sdl.Surface) {
 			stopped = true
 		}
 
-
-		updateTimer(mem, timer, instrLength)
-		graphics.updateGraphics(instrLength)
-		if handleInterrupts(mem, reg, interruptMaster) {
+		updateTimer(gb.mem, timer, instrLength)
+		gb.graphics.updateGraphics(instrLength)
+		if handleInterrupts(gb.mem, gb.reg, interruptMaster) {
 			halted = false
 		}
-		handleInput(&input, mem)
+		handleInput(&input, gb.mem)
 
 		// Swap out the boot rom
 		if oldPC == 0xfe && !bootromSwapped {
-			mem.swapBootRom(cart)
+			gb.mem.swapBootRom(cart)
 			bootromSwapped = true
 		}
 	}
@@ -365,14 +394,4 @@ func readArgByte(mem *memory, reg *register, offset int) uint8 {
 // Read a halfword from memory from address SP + offset and returns the value
 func readArgHalfword(mem *memory, reg *register, offset int) uint16 {
 	return mem.read16(reg.PC + uint16(offset))
-}
-
-func initializeSystem(cart []uint8, bootrom []uint8, ren *sdl.Surface) (*cartridgeInfo, *memory, *register, *map[uint8]*instruction, *map[uint8]*cbInstruction, *graphics) {
-	cartridgeInfo := createCartridgeInfo(cart)
-	instructionMap := createInstructionMap()
-	cbInstrucionMap := createCBInstructionMap()
-	mem := memInit(bootrom, cart)
-	graphics := createGraphics(mem, ren, cartridgeInfo)
-	registers := new(register)
-	return cartridgeInfo, mem, registers, instructionMap, cbInstrucionMap, graphics
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/hayeb/goboy/gameboy"
 	"github.com/banthar/Go-SDL/sdl"
 	"io/ioutil"
+	"flag"
 )
 
 func check(e error) {
@@ -13,16 +14,22 @@ func check(e error) {
 }
 
 func main() {
-	bootrom, error1 := ioutil.ReadFile("resources/DMG_ROM.bin")
-	check(error1)
 
-	cartridge, error2 := ioutil.ReadFile("resources/07.gb.gb")
+	rom := flag.String("rom", "", "Rom to be loaded")
+	scale := flag.Int("scale", 4, "Scaling factor to be used. Default is 4, resulting in 4*160 x 4*144 resolution")
+	debug := flag.Bool("debug", false, "Whether to emit debug information during execution")
+	speed := flag.Int("speed", 1, "Speed factor")
+
+	flag.Parse()
+
+	cartridge, error2 := ioutil.ReadFile(*rom)
 	check(error2)
 
 	sdl.Init(sdl.INIT_EVERYTHING)
 
-	window := sdl.SetVideoMode(4 * 160, 4 * 144, 32, sdl.HWACCEL)
+	window := sdl.SetVideoMode(4*160, 4*144, 32, sdl.HWACCEL)
 	sdl.JoystickEventState(sdl.DISABLE)
 
-	gameboy.Run(cartridge, bootrom, window)
+	gb := gameboy.Initialize(cartridge, window, &gameboy.Options{Scaling: *scale, Debug: *debug, Speed: *speed})
+	gb.Run(cartridge, window)
 }
