@@ -47,6 +47,7 @@ func createCBInstructionMap() *map[uint8]*cbInstruction {
 		0x87: newCBInstruction("RES 0,A", 2, 8, res0A),
 		0x9e: newCBInstruction("RES 3,(HL)", 2, 8, res3hl),
 		0xbe: newCBInstruction("RES 7,(HL)", 2, 8, res7hl),
+		0xcf: newCBInstruction("SET 1,A", 2, 8, set1A),
 		0xde: newCBInstruction("SET 3,(HL)", 2, 16, set3hl),
 		0xfe: newCBInstruction("SET 7,(HL)", 2, 16, set_7_hl),
 	}
@@ -286,6 +287,12 @@ func slaA(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.Flag.Z = reg.A == 0
 	reg.Flag.N = false
 	reg.Flag.H = false
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func set1A(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.A = setBit(reg.A, 7)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }

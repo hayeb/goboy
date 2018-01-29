@@ -84,10 +84,13 @@ func createInstructionMap() *map[uint8]*instruction {
 		0x3e: newInstruction("LD A,d8", 2, 8, ldA),
 
 		0x40: newInstruction("LD B,B", 1, 4, ldBB),
+		0x44: newInstruction("LD B,H", 1, 4, ldBH),
 		0x46: newInstruction("LD B,(HL)", 1, 8, ldBHL),
 		0x47: newInstruction("LD B,A", 1, 4, ldBA),
-		0x4f: newInstruction("LD C,A", 1, 4, ldcA),
+		0x4d: newInstruction("LD C,L", 1, 4, ldCL),
 		0x4e: newInstruction("LD C,(HL)", 1, 8, ldCHL),
+		0x4f: newInstruction("LD C,A", 1, 4, ldCA),
+
 		0x50: newInstruction("LD D,B", 1, 4, ldDB),
 		0x54: newInstruction("LD D,H", 1, 4, ldDH),
 		0x56: newInstruction("LD D,(HL)", 1, 8, ldDHL),
@@ -99,6 +102,7 @@ func createInstructionMap() *map[uint8]*instruction {
 		0x60: newInstruction("LD H,B", 1, 4, ldHB),
 		0x61: newInstruction("LD H,C", 1, 4, ldHC),
 		0x62: newInstruction("LD H,D", 1, 4, ldHD),
+		0x66: newInstruction("LD H,(HL)", 1, 8, ldHHL),
 		0x67: newInstruction("LD H,A", 1, 4, ldHA),
 		0x69: newInstruction("LD L,C", 1, 4, ldLC),
 		0x6b: newInstruction("LD L,E", 1, 4, ldLE),
@@ -134,6 +138,7 @@ func createInstructionMap() *map[uint8]*instruction {
 		0xa1: newInstruction("AND C", 1, 4, andC),
 		0xa7: newInstruction("AND A", 1, 4, andA),
 		0xa9: newInstruction("XOR C", 1, 4, xorC),
+		0xab: newInstruction("XOR E", 1, 4, xorE),
 		0xad: newInstruction("XOR L", 1, 4, xorL),
 		0xae: newInstruction("XOR (HL)", 1, 8, xorHl),
 		0xaf: newInstruction("XOR A", 1, 4, xorA),
@@ -165,6 +170,7 @@ func createInstructionMap() *map[uint8]*instruction {
 
 		0xd0: newConditionalInstruction("RET NC", 1, 20, 8, retNC),
 		0xd1: newInstruction("POP DE", 1, 12, popDe),
+		0xd2: newConditionalInstruction("JP NC,a16",3, 16,12, jpNcA16),
 		0xd5: newInstruction("PUSH DE", 1, 16, pushDe),
 		0xd6: newInstruction("SUB d8", 2, 8, subD8),
 		0xd8: newConditionalInstruction("RET C", 1, 20, 8, retC),
@@ -273,6 +279,15 @@ func jpNzA16(mem *memory, reg *register, instr *instruction) int {
 	return instr.durationNoop
 }
 
+func jpNcA16(mem *memory, reg *register, instr *instruction) int {
+	if !reg.Flag.C {
+		reg.PC = readArgHalfword(mem, reg, 1)
+		return instr.durationAction
+	}
+	reg.incPC(instr.bytes)
+	return instr.durationNoop
+}
+
 func incB(_ *memory, reg *register, instr *instruction) int {
 	incRegister(&reg.B, reg)
 	reg.incPC(instr.bytes)
@@ -305,8 +320,8 @@ func ldC(mem *memory, reg *register, instr *instruction) int {
 	return instr.durationAction
 }
 
-func ldCA(mem *memory, reg *register, instr *instruction) int {
-	mem.write8(0xFF00+uint16(reg.C), reg.A)
+func ldCL(mem *memory, reg *register, instr *instruction) int {
+	reg.C = reg.L
 	// Does not affect flags
 	reg.incPC(instr.bytes)
 	return instr.durationAction
@@ -462,7 +477,7 @@ func decB(_ *memory, reg *register, instr *instruction) int {
 	return instr.durationAction
 }
 
-func ldcA(_ *memory, reg *register, instr *instruction) int {
+func ldCA(_ *memory, reg *register, instr *instruction) int {
 	reg.C = reg.A
 	reg.incPC(instr.bytes)
 	return instr.durationAction
@@ -1142,6 +1157,11 @@ func ldBB(_ *memory, reg *register, instr *instruction) int {
 	return instr.durationAction
 }
 
+func ldBH(_ *memory, reg *register, instr *instruction) int {
+	reg.incPC(instr.bytes)
+	return instr.durationAction
+}
+
 func orA(_ *memory, reg *register, instr *instruction) int {
 	reg.A |= reg.A
 
@@ -1180,6 +1200,17 @@ func ord8(mem *memory, reg *register, instr *instruction) int {
 
 func xorC(_ *memory, reg *register, instr *instruction) int {
 	reg.A ^= reg.C
+	reg.Flag.Z = reg.A == 0
+	reg.Flag.N = false
+	reg.Flag.H = false
+	reg.Flag.C = false
+
+	reg.incPC(instr.bytes)
+	return instr.durationAction
+}
+
+func xorE(_ *memory, reg *register, instr *instruction) int {
+	reg.A ^= reg.E
 	reg.Flag.Z = reg.A == 0
 	reg.Flag.N = false
 	reg.Flag.H = false
@@ -1260,6 +1291,13 @@ func ldEHL(mem *memory, reg *register, instr *instruction) int {
 
 func ldDHL(mem *memory, reg *register, instr *instruction) int {
 	reg.D = mem.read8(reg.readDuo(REG_HL))
+
+	reg.incPC(instr.bytes)
+	return instr.durationAction
+}
+
+func ldHHL(mem *memory, reg *register, instr *instruction) int {
+	reg.H = mem.read8(reg.readDuo(REG_HL))
 
 	reg.incPC(instr.bytes)
 	return instr.durationAction
