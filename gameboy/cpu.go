@@ -25,7 +25,6 @@ func (gb *gameboy) Step() {
 		gb.interruptEnableScheduled = false
 		gb.interruptMaster = true
 	} else if gb.interruptDisableScheduled {
-		fmt.Println("Enabling interrupts")
 		gb.interruptDisableScheduled = false
 		gb.interruptMaster = false
 	}
