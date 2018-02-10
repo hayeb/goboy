@@ -100,7 +100,7 @@ func TestLDSP(t *testing.T) {
 	resultReg := dummyRegs()
 	resultReg.SP = halfWordRegister(0xfefe)
 
-	testInstruction(t, mem, regs, ldSpd16, resultReg, mem, "LD SP")
+	testInstruction(t, mem, regs, ldSPd16, resultReg, mem, "LD SP")
 }
 
 func TestXOR(t *testing.T) {
@@ -127,7 +127,7 @@ func TestLDHL(t *testing.T) {
 	resultReg := dummyRegs()
 	resultReg.writeDuo(REG_HL, 0xfefe)
 
-	testInstruction(t, mem, regs, ldHl, resultReg, mem, "LD HL")
+	testInstruction(t, mem, regs, ldHL, resultReg, mem, "LD HL")
 }
 
 func TestLDDHLA(t *testing.T) {
@@ -170,11 +170,11 @@ func TestJRNZ(t *testing.T) {
 
 	resultRegs := dummyRegs()
 	resultRegs.PC = 0xffee
-	testInstruction(t, mem, regs, jrNz, resultRegs, mem, "JR NZ")
+	testInstruction(t, mem, regs, jrNZr8, resultRegs, mem, "JR NZ")
 
 	mem.write16(0x1, 0xffee)
 	regs.Flag.Z = true
-	testInstruction(t, mem, regs, jrNz, regs, mem, "JR NZ")
+	testInstruction(t, mem, regs, jrNZr8, regs, mem, "JR NZ")
 }
 
 func testCbInstruction(t *testing.T, mem *memory, regs *register, executor cbInstructionExecutor, resultReg *register, resultMem *memory, name string) {
