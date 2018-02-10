@@ -218,7 +218,7 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 	// there are 8 pixels width in a tile
 	var offsetInLine = scX / 8
 
-	var tileNumber int = int(graphics.videoRam[tileMapAddress+offsetInLine])
+	var tileNumber = int(graphics.videoRam[tileMapAddress+offsetInLine])
 
 	if !testBit(graphics.ioPorts[LCDC], 4) {
 		tileNumber += 256

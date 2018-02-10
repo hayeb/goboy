@@ -40,6 +40,7 @@ func createCBInstructionMap() *map[uint8]*cbInstruction {
 		0x71: newCBInstruction("BIT 6,C", 2, 8, bit_6_c),
 		0x77: newCBInstruction("BIT 6,A", 2, 8, bit_6_a),
 		0x78: newCBInstruction("BIT 7,B", 2, 8, bit_7_b),
+		0x79: newCBInstruction("BIT 7,C", 2, 8, bit_7_c),
 		0x7c: newCBInstruction("BIT 7,H", 2, 8, bit_7_h),
 		0x7e: newCBInstruction("BIT 7,(HL)", 2, 16, bit_7_hl),
 		0x7f: newCBInstruction("BIT 7,A", 2, 8, bit_7_a),
@@ -188,6 +189,13 @@ func bit_6_a(_ *memory, reg *register, cbInstr *cbInstruction) int {
 
 func bit_7_b(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.bit(7, reg.B)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func bit_7_c(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(7, reg.C)
 
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
