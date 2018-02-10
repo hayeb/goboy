@@ -119,6 +119,7 @@ func (graphics *graphics) drawCurrentLine() {
 }
 
 func (graphics *graphics) drawSprites(background *[160]uint8) {
+	return
 	bytesInSprite := uint16(16)
 	if testBit(graphics.ioPorts[LCDC], 2) {
 		bytesInSprite = 32
@@ -218,13 +219,17 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 	// there are 8 pixels width in a tile
 	var offsetInLine = scX / 8
 
-	var tileNumber = int(graphics.videoRam[tileMapAddress+offsetInLine])
-
+	var tileNumber = int(int8(graphics.videoRam[tileMapAddress+offsetInLine]))
 	if !testBit(graphics.ioPorts[LCDC], 4) {
-		tileNumber += 256
+		tileNumber += 128
 	}
+
 	for i := 0; i < 160; i++ {
-		var dataAddr = uint16(tileNumber)*16 + uint16(y*2)
+		baseAddr := uint16(0x000)
+		if  !testBit(graphics.ioPorts[LCDC], 4) {
+			baseAddr = 0x800
+		}
+		var dataAddr = baseAddr + uint16(tileNumber)*16 + uint16(y*2)
 
 		lowerByte := graphics.videoRam[dataAddr]
 		higherByte := graphics.videoRam[dataAddr+1]
@@ -243,9 +248,9 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 		if x == 8 {
 			x = 0
 			offsetInLine = offsetInLine + 1
-			tileNumber = int(graphics.videoRam[tileMapAddress+offsetInLine])
+			tileNumber = int(int8(graphics.videoRam[tileMapAddress+offsetInLine]))
 			if !testBit(graphics.ioPorts[LCDC], 4) {
-				tileNumber += 256
+				tileNumber += 128
 			}
 		}
 	}

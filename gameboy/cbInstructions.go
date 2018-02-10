@@ -57,15 +57,27 @@ func createCBInstructionMap() *map[uint8]*cbInstruction {
 
 		0x86: newCBInstruction("RES 0,(HL)", 2, 16, res0hl),
 		0x87: newCBInstruction("RES 0,A", 2, 8, res0A),
+		0x8e: newCBInstruction("RES 1,(HL)", 2, 16, res1hl),
 
+		0x96: newCBInstruction("RES 2,(HL)", 2, 16, res2hl),
 		0x9e: newCBInstruction("RES 3,(HL)", 2, 8, res3hl),
 
+		0xae: newCBInstruction("RES 5,(HL)", 2, 16, res5hl),
+
+		0xb6: newCBInstruction("RES 6,(HL)", 2, 16, res6hl),
 		0xbe: newCBInstruction("RES 7,(HL)", 2, 8, res7hl),
 
+		0xc6: newCBInstruction("SET 0,(HL)", 2, 16, set0hl),
+		0xc7: newCBInstruction("SET 0,A", 2, 8, set0A),
+		0xce: newCBInstruction("SET 1,(HL)", 2, 16, set_1_hl),
 		0xcf: newCBInstruction("SET 1,A", 2, 8, set1A),
 
+		0xd7: newCBInstruction("SET 2,A", 2, 8, set2A),
 		0xde: newCBInstruction("SET 3,(HL)", 2, 16, set3hl),
 
+		0xee: newCBInstruction("SET 5,(HL)", 2, 16, set5hl),
+
+		0xf7: newCBInstruction("SET 6,A", 2, 8, set6A),
 		0xfe: newCBInstruction("SET 7,(HL)", 2, 16, set_7_hl),
 	}
 }
@@ -289,8 +301,32 @@ func res0hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
+func res1hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	mem.write8(reg.readDuo(REG_HL), resetBit(mem.read8(reg.readDuo(REG_HL)), 1))
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func res2hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	mem.write8(reg.readDuo(REG_HL), resetBit(mem.read8(reg.readDuo(REG_HL)), 2))
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
 func res3hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	mem.write8(reg.readDuo(REG_HL), resetBit(mem.read8(reg.readDuo(REG_HL)), 3))
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func res5hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	mem.write8(reg.readDuo(REG_HL), resetBit(mem.read8(reg.readDuo(REG_HL)), 5))
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func res6hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	mem.write8(reg.readDuo(REG_HL), resetBit(mem.read8(reg.readDuo(REG_HL)), 6))
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
@@ -330,7 +366,6 @@ func slaHL(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.Flag.C = val>>7 == 1
 	reg.A = val << 1
 
-
 	reg.Flag.Z = reg.A == 0
 	reg.Flag.N = false
 	reg.Flag.H = false
@@ -349,8 +384,32 @@ func slaA(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
+func set_1_hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	mem.write8(reg.readDuo(REG_HL), setBit(mem.read8(reg.readDuo(REG_HL)), 1))
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func set0A(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.A = setBit(reg.A, 0)
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
 func set1A(mem *memory, reg *register, cbInstr *cbInstruction) int {
-	reg.A = setBit(reg.A, 7)
+	reg.A = setBit(reg.A, 1)
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func set2A(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.A = setBit(reg.A, 2)
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func set6A(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.A = setBit(reg.A, 6)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
@@ -363,6 +422,14 @@ func set_7_hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
+func set0hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	address := reg.readDuo(REG_HL)
+	val := mem.read8(address)
+	mem.write8(address, setBit(val, 0))
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
 func set3hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	address := reg.readDuo(REG_HL)
 	val := mem.read8(address)
@@ -371,8 +438,16 @@ func set3hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
+func set5hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	address := reg.readDuo(REG_HL)
+	val := mem.read8(address)
+	mem.write8(address, setBit(val, 5))
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
 func srlA(_ *memory, reg *register, cbInstr *cbInstruction) int {
-	reg.Flag.C = reg.A & 0x1 == 1
+	reg.Flag.C = reg.A&0x1 == 1
 	reg.A >>= 1
 
 	reg.Flag.Z = reg.A == 0
@@ -383,7 +458,7 @@ func srlA(_ *memory, reg *register, cbInstr *cbInstruction) int {
 }
 
 func srlB(_ *memory, reg *register, cbInstr *cbInstruction) int {
-	reg.Flag.C = reg.B & 0x1 == 1
+	reg.Flag.C = reg.B&0x1 == 1
 	reg.B >>= 1
 
 	reg.Flag.Z = reg.B == 0
@@ -417,9 +492,7 @@ func rotateRight(r *uint8, reg *register) int {
 	reg.Flag.Z = reg.C == 0
 	reg.Flag.N = false
 	reg.Flag.H = false
-	reg.Flag.C = reg.C & 0x1 == 1
+	reg.Flag.C = reg.C&0x1 == 1
 	reg.incPC(2)
 	return 8
 }
-
-
