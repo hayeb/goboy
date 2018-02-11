@@ -2,22 +2,22 @@ package gameboy
 
 import (
 	"fmt"
-	"os"
 )
 
 type memory struct {
-	bank0                   [16 * 1024]uint8    // 0x0000 (16 kB)
-	switchableRomBank       [16 * 1024]uint8    // 0x4000 (16 kB)
-	videoRam                [8 * 1024]uint8     // 0x8000 (8 kB)
-	switchableRamBank       [4 * 8 * 1024]uint8 // 0xA000 (8 kB)
-	internalRam8kb          [8 * 1024]uint8     // 0xC000 (8 kB)
-	echoInternalRam         [8 * 1024]uint8     // 0xE000 (8 kB)
-	spriteAttribMemory      [7680]uint8         // 0xFE00 (7680 B)
-	empty1                  [96]uint8           // 0xFEA0 (96 B)
-	ioPorts                 [76]uint8           // 0xFF00 (67 B)
-	empty2                  [52]uint8           // 0xFF4C (52 B)
-	internalRam             [127]uint8          // 0xFF80 (127 B)
-	interruptEnableRegister uint8               // 0xFFFF (1 B)
+	// TODO: Only MBC1 and MBC2 are supported now.
+	switchableRomBank [125][16 * 1024]uint8 // 0x000, 0x4000 (16 kB)
+	videoRam          [8 * 1024]uint8       // 0x8000 (8 kB)
+	// TODO: MBC2 has 512 x 4 bits.
+	switchableRamBank       [4][8 * 1024]uint8 // 0xA000 (8 kB)
+	internalRam8kb          [8 * 1024]uint8    // 0xC000 (8 kB)
+	echoInternalRam         [8 * 1024]uint8    // 0xE000 (8 kB)
+	spriteAttribMemory      [7680]uint8        // 0xFE00 (7680 B)
+	empty1                  [96]uint8          // 0xFEA0 (96 B)
+	ioPorts                 [76]uint8          // 0xFF00 (67 B)
+	empty2                  [52]uint8          // 0xFF4C (52 B)
+	internalRam             [127]uint8         // 0xFF80 (127 B)
+	interruptEnableRegister uint8              // 0xFFFF (1 B)
 	memorySettings          memorySettings
 }
 
@@ -72,23 +72,21 @@ var bootrom = []uint8{
 	0x3e, 0x01, 0xe0, 0x50}
 
 func memInit(cartridge []uint8, cartInfo *cartridgeInfo) *memory {
-	b0 := [16 * 1024]uint8{}
-	sw := [16 * 1024]uint8{}
+	sw := [125][16 * 1024]uint8{}
 	for index, item := range bootrom {
-		b0[index] = item
+		sw[0][index] = item
 	}
-	for i := 0x100; i < len(b0); i++ {
-		b0[i] = cartridge[i]
+	for i := 0x100; i < len(sw[0]); i++ {
+		sw[0][i] = cartridge[i]
 	}
-	for j := 0; j < len(sw); j++ {
-		sw[j] = cartridge[j+len(sw)]
+	for j := 0; j < len(sw[0]); j++ {
+		sw[1][j] = cartridge[j+len(sw[0])]
 	}
 
 	mem := &memory{
-		bank0:                   b0,
 		switchableRomBank:       sw,
 		videoRam:                [8 * 1024]uint8{},
-		switchableRamBank:       [4 * 8 * 1024]uint8{},
+		switchableRamBank:       [4][8 * 1024]uint8{},
 		internalRam8kb:          [8 * 1024]uint8{},
 		echoInternalRam:         [8 * 1024]uint8{},
 		spriteAttribMemory:      [7680]uint8{},
@@ -98,9 +96,11 @@ func memInit(cartridge []uint8, cartInfo *cartridgeInfo) *memory {
 		internalRam:             [127]uint8{},
 		interruptEnableRegister: 0,
 		memorySettings: memorySettings{
-			romBanking:       true,
-			mbc1:             cartInfo.mbc1,
-			mbc2:             cartInfo.mbc2,
+			romBanking:     true,
+			mbc1:           cartInfo.mbc1,
+			mbc2:           cartInfo.mbc2,
+			currentROMBank: 1,
+			currentRAMBank: 0,
 		},
 	}
 	return mem
@@ -139,13 +139,13 @@ func mapAddr(addr uint16) int {
 func (memory *memory) read8(address uint16) uint8 {
 	switch mapAddr(address) {
 	case bank0:
-		return memory.bank0[address]
+		return memory.switchableRomBank[0][address]
 	case switchableRomBank:
-		return memory.switchableRomBank[address-0x4000+uint16(memory.memorySettings.currentROMBank)*0x4000]
+		return memory.switchableRomBank[memory.memorySettings.currentROMBank][address-0x4000]
 	case videoRam:
 		return memory.videoRam[address-0x8000]
 	case switchableRamBank:
-		return memory.switchableRamBank[address-0xA000+uint16(memory.memorySettings.currentRAMBank*0x2000)]
+		return memory.switchableRamBank[memory.memorySettings.currentRAMBank][address-0xA000]
 	case internalRam8kb:
 		return memory.internalRam8kb[address-0xC000]
 	case echoInternalRam8kb:
@@ -166,13 +166,13 @@ func (memory *memory) read8(address uint16) uint8 {
 func (memory *memory) read16(address uint16) uint16 {
 	switch mapAddr(address) {
 	case bank0:
-		return uint16(memory.bank0[address]) | (uint16(memory.bank0[address+1]) << 8)
+		return uint16(memory.switchableRomBank[0][address]) | (uint16(memory.switchableRomBank[0][address+1]) << 8)
 	case switchableRomBank:
-		taddress := address - 0x4000 + uint16(memory.memorySettings.currentROMBank)*0x4000
-		return uint16(memory.switchableRomBank[taddress]) | (uint16(memory.switchableRomBank[taddress+1]) << 8)
+		taddress := address - 0x4000
+		return uint16(memory.switchableRomBank[memory.memorySettings.currentROMBank][taddress]) | (uint16(memory.switchableRomBank[memory.memorySettings.currentROMBank][taddress+1]) << 8)
 	case switchableRamBank:
-		taddr := address - 0xA000 + uint16(memory.memorySettings.currentRAMBank*0x2000)
-		return uint16(memory.switchableRamBank[taddr]) | uint16(memory.switchableRamBank[taddr+1])<<8
+		taddr := address - 0xA000
+		return uint16(memory.switchableRamBank[memory.memorySettings.currentRAMBank][taddr]) | uint16(memory.switchableRamBank[memory.memorySettings.currentRAMBank][taddr+1])<<8
 	case internalRam8kb:
 		return uint16(memory.internalRam8kb[address-0xC000]) | uint16(memory.internalRam8kb[address-0xC000+1])<<8
 	case ioPorts:
@@ -196,7 +196,7 @@ func (memory *memory) write8(address uint16, val uint8) {
 	case videoRam:
 		memory.videoRam[address-0x8000] = val
 	case switchableRamBank:
-		memory.switchableRamBank[address-0xa000] = val
+		memory.switchableRamBank[memory.memorySettings.currentRAMBank][address-0xa000] = val
 	case internalRam8kb:
 		memory.internalRam8kb[address-0xc000] = val
 	case echoInternalRam8kb:
@@ -256,8 +256,8 @@ func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 func (memory *memory) write16(address uint16, val uint16) {
 	switch mapAddr(address) {
 	case bank0:
-		memory.bank0[address] = uint8(val)
-		memory.bank0[address+1] = uint8(val >> 8)
+		memory.switchableRomBank[0][address] = uint8(val)
+		memory.switchableRomBank[0][address+1] = uint8(val >> 8)
 	case internalRam8kb:
 		memory.internalRam8kb[address-0xC000] = uint8(val)
 		memory.internalRam8kb[address-0xC000+1] = uint8(val >> 8)
@@ -269,69 +269,26 @@ func (memory *memory) write16(address uint16, val uint16) {
 func (memory *memory) doBankingAction(address uint16, val uint8) {
 	fmt.Println("Banking action!")
 	settings := memory.memorySettings
-	if address < 0x2000 && (settings.mbc1 || settings.mbc2) {
-		memory.doRAMBankEnable(address, val)
-	} else if address >= 0x2000 && address < 0x4000 && (settings.mbc1 || settings.mbc2) {
-		memory.doChangeLoROMBank(address, val)
-	} else if address > 0x4000 && address < 0x6000 {
-		if settings.mbc1 {
-			if settings.romBanking {
-				memory.doChangeHiRomBank(val)
-			} else {
-				memory.doRAMBankChange(val)
-			}
-		}
-	} else if address >= 0x6000 && address < 0x8000 && settings.mbc1 {
-		memory.doChangeROMRAMMode(val)
-	}
-}
 
-func (memory *memory) doRAMBankEnable(address uint16, val uint8) {
-	fmt.Println(os.Stderr, "Performing RAM bank enable switch")
-	settings := &memory.memorySettings
-	if settings.mbc2 && address&(1<<4) == 1 {
+	if !settings.mbc1 && !settings.mbc2 {
 		return
 	}
 
-	var test = val & 0xf
-	if test == 0xA {
-		settings.ramEnabled = true
-	} else if test == 0x0 {
-		settings.ramEnabled = false
+	if settings.mbc1 {
+		mbc1BankingAction(address, val)
+	} else if settings.mbc2 {
+		mbc2BankingAction(address, val)
+	} else {
+		panic("Banking action not supported yet!")
 	}
 }
 
-func (memory *memory) doChangeLoROMBank(address uint16, val uint8) {
-	fmt.Println(os.Stderr, "Performing LoROM bank switching")
-	if memory.memorySettings.mbc2 {
-		memory.memorySettings.currentROMBank = int(val & 0xF)
-		return
-	}
-	var lower5 = val & 31
-	memory.memorySettings.currentROMBank &= 224
-	memory.memorySettings.currentROMBank |= int(lower5)
+func mbc1BankingAction(address uint16, val uint8) {
+
 }
 
-func (memory *memory) doChangeHiRomBank(val uint8) {
-	fmt.Println(os.Stderr, "Performing HiROM bank switching")
-	memory.memorySettings.currentROMBank &= 31
+func mbc2BankingAction(address uint16, val uint8) {
 
-	val &= 224
-	memory.memorySettings.currentROMBank |= int(val)
-}
-
-func (memory *memory) doRAMBankChange(val uint8) {
-	fmt.Println(os.Stderr, "Performing RAM bank change")
-	memory.memorySettings.currentRAMBank = int(val & 0x3)
-}
-
-func (memory *memory) doChangeROMRAMMode(val uint8) {
-	fmt.Println(os.Stderr, "Performing ROM/RAM mode change")
-	newData := val & 0x1
-	memory.memorySettings.romBanking = newData == 0
-	if memory.memorySettings.romBanking {
-		memory.memorySettings.currentRAMBank = 0
-	}
 }
 
 func (memory *memory) requestInterupt(interruptType int) {
@@ -342,6 +299,6 @@ func (memory *memory) requestInterupt(interruptType int) {
 
 func (memory *memory) swapBootRom(cartridge []uint8) {
 	for i := 0; i < 0x100; i += 1 {
-		memory.bank0[i] = cartridge[i]
+		memory.switchableRomBank[0][i] = cartridge[i]
 	}
 }
