@@ -27,12 +27,14 @@ func createCBInstructionMap() *map[uint8]*cbInstruction {
 		0x37: newCBInstruction("SWAP A", 2, 8, swapA),
 		0x38: newCBInstruction("SRL B", 2, 8, srlB),
 		0x3a: newCBInstruction("SRL D", 2, 8, srlD),
+		0x3b: newCBInstruction("SRL E", 2, 8, srlE),
 		0x3f: newCBInstruction("SRL A", 2, 8, srlA),
 
 		0x40: newCBInstruction("BIT 0,B", 2, 8, bit_0_b),
 		0x41: newCBInstruction("BIT 0,C", 2, 8, bit_0_c),
 		0x47: newCBInstruction("BIT 0,A", 2, 8, bit_0_a),
 		0x48: newCBInstruction("BIT 1,B", 2, 8, bit_1_b),
+		0x4e: newCBInstruction("BIT 1,(HL)", 2, 8, bit_1_hl),
 		0x4f: newCBInstruction("BIT 1,A", 2, 8, bit_1_a),
 
 		0x50: newCBInstruction("BIT 2,B", 2, 8, bit_2_b),
@@ -49,11 +51,15 @@ func createCBInstructionMap() *map[uint8]*cbInstruction {
 
 		0x70: newCBInstruction("BIT 6,B", 2, 8, bit_6_b),
 		0x71: newCBInstruction("BIT 6,C", 2, 8, bit_6_c),
+		0x74: newCBInstruction("BIT 6,H", 2, 8, bit_6_h),
 		0x76: newCBInstruction("BIT 6,(HL)", 2, 8, bit_6_hl),
 		0x77: newCBInstruction("BIT 6,A", 2, 8, bit_6_a),
 		0x78: newCBInstruction("BIT 7,B", 2, 8, bit_7_b),
 		0x79: newCBInstruction("BIT 7,C", 2, 8, bit_7_c),
+		0x7a: newCBInstruction("BIT 7,D", 2, 8, bit_7_d),
+		0x7b: newCBInstruction("BIT 7,E", 2, 8, bit_7_e),
 		0x7c: newCBInstruction("BIT 7,H", 2, 8, bit_7_h),
+		0x7d: newCBInstruction("BIT 7,L", 2, 8, bit_7_l),
 		0x7e: newCBInstruction("BIT 7,(HL)", 2, 16, bit_7_hl),
 		0x7f: newCBInstruction("BIT 7,A", 2, 8, bit_7_a),
 
@@ -107,6 +113,13 @@ func bit_7_h(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
+func bit_7_l(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(7, reg.L)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
 func bit_0_a(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.bit(0, reg.A)
 
@@ -130,6 +143,13 @@ func bit_0_c(_ *memory, reg *register, cbInstr *cbInstruction) int {
 
 func bit_1_b(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.bit(1, reg.B)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func bit_1_hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(1, mem.read8(reg.readDuo(REG_HL)))
 
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
@@ -205,6 +225,13 @@ func bit_6_c(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	return cbInstr.actionDuration
 }
 
+func bit_6_h(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(6, reg.H)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
 func bit_6_hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.bit(6, mem.read8(reg.readDuo(REG_HL)))
 
@@ -249,6 +276,20 @@ func bit_7_b(_ *memory, reg *register, cbInstr *cbInstruction) int {
 
 func bit_7_c(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.bit(7, reg.C)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func bit_7_d(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(7, reg.D)
+
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+func bit_7_e(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.bit(7, reg.E)
 
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
@@ -503,6 +544,18 @@ func srlD(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	reg.D >>= 1
 
 	reg.Flag.Z = reg.D == 0
+	reg.Flag.N = false
+	reg.Flag.H = false
+	reg.incPC(cbInstr.bytes)
+	return cbInstr.actionDuration
+}
+
+
+func srlE(_ *memory, reg *register, cbInstr *cbInstruction) int {
+	reg.Flag.C = reg.E&0x1 == 1
+	reg.E >>= 1
+
+	reg.Flag.Z = reg.E == 0
 	reg.Flag.N = false
 	reg.Flag.H = false
 	reg.incPC(cbInstr.bytes)

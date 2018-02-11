@@ -239,11 +239,13 @@ func (gb *Gameboy) executeInstruction() (int, string) {
 
 	if instr.name != "CB" {
 		if gb.options.Debug && gb.bootromSwapped {
-			format, value  := "%-#02x", uint16(readArgByte(gb.mem, gb.reg))
-			if instr.bytes == 3 {
-				format, value = "%-#04x",  readArgHalfword(gb.mem, gb.reg)
+			if instr.bytes == 1 {
+				fmt.Printf("%#04x %-12s\n", gb.reg.PC, instr.name)
+			} else if instr.bytes == 2 {
+				fmt.Printf("%#04x %-12s%-#02x\n", gb.reg.PC, instr.name, uint16(readArgByte(gb.mem, gb.reg)))
+			} else if instr.bytes == 3 {
+				fmt.Printf("%#04x %-12s%-#04x\n", gb.reg.PC, instr.name, uint16(readArgHalfword(gb.mem, gb.reg)))
 			}
-			fmt.Printf("%#04x %-12s " + format + "\n", gb.reg.PC, instr.name, value)
 		}
 
 		cycles := instr.executor(gb.mem, gb.reg, instr)

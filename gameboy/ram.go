@@ -28,8 +28,8 @@ type memorySettings struct {
 	romBanking bool
 	ramEnabled bool
 
-	currentROMBank int
-	currentRAMBank int
+	currentROMBank uint8
+	currentRAMBank uint8
 }
 
 const (
@@ -79,8 +79,11 @@ func memInit(cartridge []uint8, cartInfo *cartridgeInfo) *memory {
 	for i := 0x100; i < len(sw[0]); i++ {
 		sw[0][i] = cartridge[i]
 	}
-	for j := 0; j < len(sw[0]); j++ {
-		sw[1][j] = cartridge[j+len(sw[0])]
+
+	for bank := 1; bank < len(cartridge) / (16 * 1024); bank++ {
+		for j := 0; j < 16 * 1024; j++ {
+			sw[bank][j] = cartridge[bank*16 * 1024 + j]
+		}
 	}
 
 	mem := &memory{
@@ -267,7 +270,6 @@ func (memory *memory) write16(address uint16, val uint16) {
 }
 
 func (memory *memory) doBankingAction(address uint16, val uint8) {
-	fmt.Println("Banking action!")
 	settings := memory.memorySettings
 
 	if !settings.mbc1 && !settings.mbc2 {
@@ -275,20 +277,30 @@ func (memory *memory) doBankingAction(address uint16, val uint8) {
 	}
 
 	if settings.mbc1 {
-		mbc1BankingAction(address, val)
+		memory.mbc1BankingAction(address, val)
 	} else if settings.mbc2 {
-		mbc2BankingAction(address, val)
+		memory.mbc2BankingAction(address, val)
 	} else {
 		panic("Banking action not supported yet!")
 	}
 }
 
-func mbc1BankingAction(address uint16, val uint8) {
-
+func (memory *memory)mbc1BankingAction(address uint16, val uint8) {
+	// TODO: Implement MBC1 banking
+	panic("MBC1 banking not implemented")
 }
 
-func mbc2BankingAction(address uint16, val uint8) {
-
+func (memory *memory)mbc2BankingAction(address uint16, val uint8) {
+	if address <= 0x1FFF {
+		panic("Disable/enable RAM not implemented")
+		// Disable/enable RAM
+	} else if address >= 0x2000 && address <= 0x3FFF {
+		// Select ROM number if 9th bit is 1
+		if address & (0x1 << 8) == 0x100 {
+			fmt.Printf("Swapping ROM to %d\n", val & 0xf)
+			memory.memorySettings.currentROMBank = val & 0xf
+		}
+	}
 }
 
 func (memory *memory) requestInterupt(interruptType int) {
