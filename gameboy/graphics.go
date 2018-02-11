@@ -224,9 +224,11 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 	// there are 8 pixels width in a tile
 	var offsetInLine = scX / 8
 
-	var tileNumber = int(int8(graphics.videoRam[tileMapAddress+offsetInLine]))
+	var tileNumber uint16 = 0
 	if !testBit(graphics.ioPorts[LCDC], 4) {
-		tileNumber += 128
+		tileNumber = uint16(128 + int(int8(graphics.videoRam[tileMapAddress+offsetInLine])))
+	} else {
+		tileNumber = uint16(graphics.videoRam[tileMapAddress+offsetInLine])
 	}
 
 	for i := 0; i < 160; i++ {
@@ -253,9 +255,10 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 		if x == 8 {
 			x = 0
 			offsetInLine = offsetInLine + 1
-			tileNumber = int(int8(graphics.videoRam[tileMapAddress+offsetInLine]))
 			if !testBit(graphics.ioPorts[LCDC], 4) {
-				tileNumber += 128
+				tileNumber = uint16(128 + int(int8(graphics.videoRam[tileMapAddress+offsetInLine])))
+			} else {
+				tileNumber = uint16(graphics.videoRam[tileMapAddress+offsetInLine])
 			}
 		}
 	}

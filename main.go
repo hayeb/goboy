@@ -47,12 +47,13 @@ func main() {
 
 	window := sdl.SetVideoMode(*scale*160, *scale*144, 32, sdl.HWACCEL)
 	defer window.Free()
+
 	sdl.JoystickEventState(sdl.DISABLE)
 
 	gb := gameboy.Initialize(cartridge, window, &gameboy.Options{Scaling: *scale, Debug: *debug, Speed: *speed})
 
 	if *debug {
-		gameboy.RunDebugger(&gb)
+		gameboy.RunDebugger(&gb, updateInput)
 	} else {
 		input := gameboy.Input{}
 		for true {

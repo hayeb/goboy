@@ -30,9 +30,10 @@ type Breakpoint struct {
 type Debugger struct {
 	breakpoints []uint16
 	gb          *Gameboy
+	input       *Input
 }
 
-func RunDebugger(gb *Gameboy) {
+func RunDebugger(gb *Gameboy, updateInputFunction func(input *Input)) {
 	fmt.Println("Welcome to the GoBoy debugger.")
 	reader := bufio.NewReader(os.Stdin)
 	stopped := false
@@ -45,6 +46,7 @@ func RunDebugger(gb *Gameboy) {
 	debugger := Debugger{
 		gb:          gb,
 		breakpoints: make([]uint16, 0),
+		input:       new(Input),
 	}
 
 	for !stopped {
@@ -62,13 +64,15 @@ func RunDebugger(gb *Gameboy) {
 			fmt.Println(pErr)
 			continue
 		}
-		stopped = debugger.handleCommand(*command)
+		stopped = debugger.handleCommand(*command, updateInputFunction)
 	}
 }
 
-func (debugger *Debugger) handleCommand(command Command) bool {
+func (debugger *Debugger) handleCommand(command Command, updateInputFunction func(input *Input)) bool {
 	if command.StepCommand {
 		debugger.gb.Step()
+		updateInputFunction(debugger.input)
+		debugger.gb.HandleInput(debugger.input)
 	} else if command.QuitCommand {
 		return true
 	} else if command.BreakpointCommand != nil {
@@ -87,6 +91,8 @@ func (debugger *Debugger) handleCommand(command Command) bool {
 		hit, bp := false, uint16(0)
 		for !hit {
 			debugger.gb.Step()
+			updateInputFunction(debugger.input)
+			debugger.gb.HandleInput(debugger.input)
 			hit, bp = debugger.breakpointHit(debugger.gb.PC())
 		}
 		fmt.Printf("Hit breakpoint at %#04x\n", bp)
@@ -118,9 +124,8 @@ func (debugger *Debugger) handleCommand(command Command) bool {
 			fmt.Printf("Timer overflow: %t %t\n", testBit(ieReg, 2), testBit(ifReg, 2))
 			fmt.Printf("Serial transfer complete: %t %t\n", testBit(ieReg, 3), testBit(ifReg, 3))
 		}
-
 	} else if command.HelpCommand {
-
+		// TODO: Implement help
 	} else {
 		fmt.Println("Command not yet implemented!")
 		return true
