@@ -7,7 +7,7 @@ import (
 
 var _ = spew.Config
 
-func (gb *gameboy) Step() {
+func (gb *Gameboy) Step() {
 	if gb.halted {
 		gb.updateTimer(4)
 		gb.graphics.updateGraphics(4)
@@ -19,22 +19,39 @@ func (gb *gameboy) Step() {
 	}
 
 	oldPC := gb.reg.PC
+
 	instrLength, name := gb.executeInstruction()
 
 	if gb.interruptEnableScheduled {
+		if gb.options.Debug {
+			fmt.Printf("%#04x: Enable interrupts\n", oldPC)
+		}
 		gb.interruptEnableScheduled = false
 		gb.interruptMaster = true
 	} else if gb.interruptDisableScheduled {
 		gb.interruptDisableScheduled = false
 		gb.interruptMaster = false
+		if gb.options.Debug {
+			fmt.Printf("%#04x: Disable interrupts\n", oldPC)
+		}
 	}
 
+	// TODO: Move to respective instructions
 	if name == "DI" {
 		gb.interruptDisableScheduled = true
+		if gb.options.Debug {
+			fmt.Println("Scheduling disable interrupts")
+		}
 	} else if name == "EI" {
 		gb.interruptEnableScheduled = true
+		if gb.options.Debug {
+			fmt.Println("Scheduling enabling interrupts")
+		}
 	} else if name == "RETI" {
 		gb.interruptMaster = true
+		if gb.options.Debug {
+			fmt.Println("Return enabling interrupts")
+		}
 	} else if name == "HALT" {
 		gb.halted = true
 	}
@@ -52,7 +69,11 @@ func (gb *gameboy) Step() {
 	}
 }
 
-func (gb *gameboy) updateTimer(cycles int) {
+func (gb *Gameboy) PC() uint16 {
+	return gb.reg.PC
+}
+
+func (gb *Gameboy) updateTimer(cycles int) {
 	gb.timer.t += cycles
 
 	if gb.timer.t >= 16 {
@@ -95,7 +116,7 @@ func (gb *gameboy) updateTimer(cycles int) {
 	}
 }
 
-func (gb *gameboy) HandleInput(input *Input) bool {
+func (gb *Gameboy) HandleInput(input *Input) bool {
 	joyPadReg := gb.mem.ioPorts[0x00]
 	if !testBit(joyPadReg, 4) && !testBit(joyPadReg, 5) {
 		// Do nothing when input is not polled
@@ -158,7 +179,7 @@ func (gb *gameboy) HandleInput(input *Input) bool {
 	return joyPadReg < 0xf
 }
 
-func (gb *gameboy) handleInterrupts() bool {
+func (gb *Gameboy) handleInterrupts() bool {
 	if !gb.interruptMaster {
 		return false
 	}
@@ -176,20 +197,31 @@ func (gb *gameboy) handleInterrupts() bool {
 	return handled
 }
 
-func (gb *gameboy) serviceInterrupt(i int, requested uint8) {
+func (gb *Gameboy) serviceInterrupt(i int, requested uint8) {
 	gb.mem.write8(0xff0f, resetBit(requested, uint(i)))
 	pushStack16(gb.mem, gb.reg, gb.reg.PC)
 
+	// TODO: Implement serial transfer
 	switch i {
 	case 0:
+		if gb.options.Debug {
+			fmt.Println("Servicing VBLANK interrupt")
+		}
 		gb.reg.PC = 0x40
 	case 1:
-		fmt.Println("Servicing LCD interrupt")
+		if gb.options.Debug {
+			fmt.Println("Servicing LCD STAT interrupt")
+		}
 		gb.reg.PC = 0x48
 	case 2:
+		if gb.options.Debug {
+			fmt.Println("Servicing timer overflow interrupt")
+		}
 		gb.reg.PC = 0x50
 	case 4:
-		fmt.Println("Servicing JOYPAD interrupt")
+		if gb.options.Debug {
+			fmt.Println("Servicing JOYPAD interrupt")
+		}
 		gb.reg.PC = 0x60
 	default:
 		panic(fmt.Sprintf("Servicing unknown interupt %d", i))
@@ -197,18 +229,21 @@ func (gb *gameboy) serviceInterrupt(i int, requested uint8) {
 }
 
 // Executes the next instruction at the PC. Returns the length (in cycles) of the instruction
-func (gb *gameboy) executeInstruction() (int, string) {
+func (gb *Gameboy) executeInstruction() (int, string) {
 	instructionCode := gb.mem.read8(gb.reg.PC)
 	instr, ok := (*gb.instructionMap)[instructionCode]
 
 	if !ok {
-		//spew.Dump(mem.videoRam)
 		panic(fmt.Sprintf("Unrecognized instruction %#02x at address %#04x", instructionCode, gb.reg.PC))
 	}
 
 	if instr.name != "CB" {
-		if gb.options.Debug {
-			fmt.Printf("%#04x\t%s\n", gb.reg.PC, instr.name)
+		if gb.options.Debug && gb.bootromSwapped {
+			format, value  := "%-#02x", uint16(readArgByte(gb.mem, gb.reg))
+			if instr.bytes == 3 {
+				format, value = "%-#04x",  readArgHalfword(gb.mem, gb.reg)
+			}
+			fmt.Printf("%#04x %-12s " + format + "\n", gb.reg.PC, instr.name, value)
 		}
 
 		cycles := instr.executor(gb.mem, gb.reg, instr)
@@ -220,7 +255,7 @@ func (gb *gameboy) executeInstruction() (int, string) {
 		if !ok {
 			panic(fmt.Sprintf("Unrecognized cb instruction %x at address %#04x", cbCode, gb.reg.PC))
 		}
-		if gb.options.Debug {
+		if gb.options.Debug && gb.bootromSwapped {
 			fmt.Printf("%#04x\t%s %s\n", gb.reg.PC, instr.name, cb.name)
 		}
 
@@ -253,11 +288,15 @@ func popStack16(mem *memory, reg *register) uint16 {
 }
 
 // Read a byte from memory from address SP + offset and returns the value
-func readArgByte(mem *memory, reg *register, offset int) uint8 {
-	return mem.read8(reg.PC + uint16(offset))
+func readArgByte(mem *memory, reg *register) uint8 {
+	return mem.read8(reg.PC + uint16(1))
 }
 
 // Read a halfword from memory from address SP + offset and returns the value
-func readArgHalfword(mem *memory, reg *register, offset int) uint16 {
-	return mem.read16(reg.PC + uint16(offset))
+func readArgHalfword(mem *memory, reg *register) uint16 {
+	return mem.read16(reg.PC + uint16(1))
+}
+
+func (gb *Gameboy) Regs() *register {
+	return gb.reg
 }

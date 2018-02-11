@@ -8,6 +8,7 @@ const (
 	ADDRESS_IO_PORTS = 0xFF00
 
 	LCDC     uint16 = 0xFF40 - ADDRESS_IO_PORTS
+	STAT     uint16 = 0xFF41 - ADDRESS_IO_PORTS
 	SCROLL_Y uint16 = 0xFF42 - ADDRESS_IO_PORTS
 	SCROLL_X uint16 = 0xFF43 - ADDRESS_IO_PORTS
 	SCANLINE uint16 = 0xFF44 - ADDRESS_IO_PORTS
@@ -42,12 +43,12 @@ type drawColor struct {
 
 func createGraphics(videoRam []uint8, ioPorts []uint8, spriteAttributeMemory []uint8, rend *sdl.Surface, speed int, scale int) *graphics {
 	return &graphics{
-		videoRam: videoRam,
-		ioPorts:  ioPorts,
+		videoRam:              videoRam,
+		ioPorts:               ioPorts,
 		spriteAttributeMemory: spriteAttributeMemory,
-		renderer: rend,
-		scaling:  scale,
-		speed:    speed,
+		renderer:              rend,
+		scaling:               scale,
+		speed:                 speed,
 	}
 }
 
@@ -56,10 +57,13 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 
 	graphics.ioPorts[SCANLINE] = graphics.line
 
+	stat := graphics.ioPorts[STAT]
+
 	// TODO: Write the LCD status to memory
 	switch graphics.mode {
 	case 0:
 		// HBLANK mode:
+		graphics.ioPorts[STAT] = resetBit(resetBit(stat, 0), 1)
 		if graphics.modeclock >= 204 {
 			graphics.modeclock = 0
 			graphics.line += 1
@@ -75,6 +79,7 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 		}
 	case 1:
 		// VBLANK mode:
+		graphics.ioPorts[STAT] = resetBit(setBit(stat, 0), 1)
 		if graphics.modeclock >= 456 {
 			graphics.modeclock = 0
 			graphics.line++
@@ -85,11 +90,13 @@ func (graphics *graphics) updateGraphics(instructionLength int) {
 			}
 		}
 	case 2:
+		graphics.ioPorts[STAT] = setBit(resetBit(stat, 0), 1)
 		if graphics.modeclock >= 80 {
 			graphics.modeclock = 0
 			graphics.mode = 3
 		}
 	case 3:
+		graphics.ioPorts[STAT] = setBit(setBit(stat, 0), 1)
 		if graphics.modeclock >= 172 {
 			graphics.modeclock = 0
 			graphics.mode = 0
@@ -119,7 +126,6 @@ func (graphics *graphics) drawCurrentLine() {
 }
 
 func (graphics *graphics) drawSprites(background *[160]uint8) {
-	return
 	bytesInSprite := uint16(16)
 	if testBit(graphics.ioPorts[LCDC], 2) {
 		bytesInSprite = 32
@@ -155,7 +161,7 @@ func (graphics *graphics) drawSprites(background *[160]uint8) {
 			if x+j < 0 || x+j > 160 {
 				continue
 			}
-			//
+
 			lowerByte := graphics.videoRam[rowAddress]
 			higherByte := graphics.videoRam[rowAddress+1]
 
@@ -192,7 +198,6 @@ func (graphics *graphics) drawSprites(background *[160]uint8) {
 
 func (graphics *graphics) drawBackground(background *[160]uint8) {
 	// TODO: Draw window
-	// TODO: Handle switching set #0, #1
 	var tileMapAddress uint16 = 0x1800
 
 	if testBit(graphics.ioPorts[LCDC], 5) {
@@ -226,7 +231,7 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 
 	for i := 0; i < 160; i++ {
 		baseAddr := uint16(0x000)
-		if  !testBit(graphics.ioPorts[LCDC], 4) {
+		if !testBit(graphics.ioPorts[LCDC], 4) {
 			baseAddr = 0x800
 		}
 		var dataAddr = baseAddr + uint16(tileNumber)*16 + uint16(y*2)

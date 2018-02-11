@@ -5,11 +5,6 @@ import (
 	"github.com/banthar/Go-SDL/sdl"
 )
 
-type IGameboy interface {
-	Step()
-	HandleInput(input *Input) bool
-}
-
 type Options struct {
 	Scaling int
 	Debug   bool
@@ -33,7 +28,7 @@ type timer struct {
 	d int
 }
 
-type gameboy struct {
+type Gameboy struct {
 	cartridgeInfo  *cartridgeInfo
 	instructionMap *map[uint8]*instruction
 	cbInstruction  *map[uint8]*cbInstruction
@@ -52,15 +47,16 @@ type gameboy struct {
 	bootromSwapped            bool
 }
 
-func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) IGameboy {
+func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) Gameboy {
+	cartInfo := createCartridgeInfo(cart)
 	instructionMap := createInstructionMap()
 	cbInstrucionMap := createCBInstructionMap()
-	mem := memInit(cart)
+	mem := memInit(cart, cartInfo)
 	graphics := createGraphics(mem.videoRam[:], mem.ioPorts[:], mem.spriteAttribMemory[:], renderer, options.Speed, options.Scaling)
 	registers := new(register)
-	cartInfo := createCartridgeInfo(cart)
 
-	gameboy := gameboy{
+
+	gameboy := Gameboy{
 		cartridgeInfo:   cartInfo,
 		instructionMap:  instructionMap,
 		cbInstruction:   cbInstrucionMap,
@@ -73,6 +69,6 @@ func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) IGameboy 
 		interruptMaster: true,
 	}
 
-	fmt.Printf("Initialized:\n%s", cartridgeInfoString(*cartInfo))
-	return &gameboy
+	fmt.Printf("GoBoy initialized:\n%s", cartridgeInfoString(*cartInfo))
+	return gameboy
 }

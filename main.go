@@ -20,7 +20,7 @@ func main() {
 
 	rom := flag.String("rom", "", "Rom to be loaded")
 	scale := flag.Int("scale", 4, "Scaling factor to be used. Default is 4, resulting in 4*160 x 4*144 resolution")
-	debug := flag.Bool("debug", false, "Whether to emit debug information during execution, default is true")
+	debug := flag.Bool("debug", false, "Whether to start the debugger")
 	speed := flag.Int("speed", 1, "Speed factor, should be >= 1. Default is 1")
 
 	flag.Parse()
@@ -51,11 +51,15 @@ func main() {
 
 	gb := gameboy.Initialize(cartridge, window, &gameboy.Options{Scaling: *scale, Debug: *debug, Speed: *speed})
 
-	input := gameboy.Input{}
-	for true {
-		gb.Step()
-		updateInput(&input)
-		gb.HandleInput(&input)
+	if *debug {
+		gameboy.RunDebugger(&gb)
+	} else {
+		input := gameboy.Input{}
+		for true {
+			gb.Step()
+			updateInput(&input)
+			gb.HandleInput(&input)
+		}
 	}
 }
 

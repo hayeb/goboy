@@ -12,12 +12,14 @@ type cartridgeInfo struct {
 	romSize      romSizeCode
 	ramSize      ramSizeCode
 	Localization string
+	mbc1         bool
+	mbc2         bool
 }
 
 type cartridgeTypeCode int
 
 const (
-	rom_only cartridgeTypeCode = iota
+	rom_only                  cartridgeTypeCode = iota
 	rom_mbc1
 	rom_mbc1_ram
 	rom_mbc1_ram_bat
@@ -44,7 +46,7 @@ const (
 type ramSizeCode int
 
 const (
-	ram_none ramSizeCode = iota
+	ram_none     ramSizeCode = iota
 	ram_kbit_16
 	ram_kbit_64
 	ram_kbit_256
@@ -66,7 +68,7 @@ const (
 type gameBoyType int
 
 const (
-	type_gameboy gameBoyType = iota
+	type_gameboy       gameBoyType = iota
 	type_super_gameboy
 )
 
@@ -289,24 +291,35 @@ func localization(code uint8) string {
 }
 
 func createCartridgeInfo(cartridge []byte) *cartridgeInfo {
+	typeCode := typeCode(cartridge[0x147])
 	return &cartridgeInfo{
 		Name:         cartridgeTitle(cartridge),
-		CartType:     typeCode(cartridge[0x147]),
+		CartType:     typeCode,
 		System:       gameboyType(cartridge[0x146]),
 		romSize:      uint8ToromSizeCode(cartridge[0x148]),
 		ramSize:      uint8ToramSizeCode(cartridge[0x149]),
 		Localization: localization(cartridge[0x14A]),
+		mbc1:         isMBC1(typeCode),
+		mbc2:         isMBC2(typeCode),
 	}
 }
 
 func cartridgeInfoString(cartridgeInfo cartridgeInfo) string {
 	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("Cartridge name: %s\n", cartridgeInfo.Name))
-	buffer.WriteString(fmt.Sprintf("Cartridge type: %s\n", cartridgeInfo.cartridgeTypeCodeString()))
-	buffer.WriteString(fmt.Sprintf("System type: %s\n", cartridgeInfo.gameboyTypeString()))
-	buffer.WriteString(fmt.Sprintf("ROM size: %s\n", cartridgeInfo.romSizeCodeString()))
-	buffer.WriteString(fmt.Sprintf("RAM size: %s\n", cartridgeInfo.ramSizeCodeString()))
-	buffer.WriteString(fmt.Sprintf("Localization: %s\n", cartridgeInfo.Localization))
+	buffer.WriteString(fmt.Sprintf("\tCartridge name: %s\n", cartridgeInfo.Name))
+	buffer.WriteString(fmt.Sprintf("\tCartridge type: %s\n", cartridgeInfo.cartridgeTypeCodeString()))
+	buffer.WriteString(fmt.Sprintf("\tSystem type: %s\n", cartridgeInfo.gameboyTypeString()))
+	buffer.WriteString(fmt.Sprintf("\tROM size: %s\n", cartridgeInfo.romSizeCodeString()))
+	buffer.WriteString(fmt.Sprintf("\tRAM size: %s\n", cartridgeInfo.ramSizeCodeString()))
+	buffer.WriteString(fmt.Sprintf("\tLocalization: %s\n", cartridgeInfo.Localization))
 
 	return buffer.String()
+}
+
+func isMBC1(code cartridgeTypeCode) bool {
+	return code == rom_mbc1 || code == rom_mbc1_ram || code == rom_mbc1_ram_bat
+}
+
+func isMBC2(code cartridgeTypeCode) bool {
+	return code == rom_mbc2 || code == rom_mbc2_batt
 }
