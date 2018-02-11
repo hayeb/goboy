@@ -276,6 +276,7 @@ func createInstructionMap() *map[uint8]*instruction {
 		0xf3: newInstruction("DI", 1, 4, di),
 		0xf5: newInstruction("PUSH AF", 1, 16, pushAf),
 		0xf6: newInstruction("OR d8", 2, 8, ord8),
+		0xf8: newInstruction("LD HL,SP+r8", 2, 12, ldHLSPr8),
 		0xf9: newInstruction("LD SP,HL", 1, 8, ldSPHl),
 		0xfa: newInstruction("LD A,(a16)", 3, 16, ldAa16),
 		0xfb: newInstruction("EI", 1, 4, ei),
@@ -2120,4 +2121,15 @@ func substractWithCarry(reg *register, val uint8) {
 	reg.Flag.C = int16(reg.A)-int16(val) < 0
 
 	reg.A = result
+}
+
+func ldHLSPr8(mem *memory, reg *register, instr *instruction) int {
+	r8 := int16(int8(readArgByte(mem, reg)))
+
+	reg.writeDuo(REG_HL, uint16(int16(reg.SP) + r8))
+
+	reg.Flag.Z = false
+	reg.Flag.N = false
+	reg.incPC(instr.bytes)
+	return instr.durationAction
 }

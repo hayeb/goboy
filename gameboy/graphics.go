@@ -200,9 +200,9 @@ func (graphics *graphics) drawBackground(background *[160]uint8) {
 	// TODO: Draw window
 	var tileMapAddress uint16 = 0x1800
 
-	if testBit(graphics.ioPorts[LCDC], 5) {
-		panic("Displaying window not yet implemented")
-	}
+	//if testBit(graphics.ioPorts[LCDC], 5) {
+	//	panic("Displaying window not yet implemented")
+	//}
 
 	if testBit(graphics.ioPorts[LCDC], 3) {
 		tileMapAddress = 0x1C00

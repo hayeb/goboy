@@ -14,6 +14,7 @@ type cartridgeInfo struct {
 	Localization string
 	mbc1         bool
 	mbc2         bool
+	mbc3         bool
 }
 
 type cartridgeTypeCode int
@@ -110,7 +111,7 @@ func (cartInfo *cartridgeInfo) cartridgeTypeCodeString() string {
 	case rom_mbc3_ram:
 		return "ROM+MBC3+RAM"
 	case rom_mbc3_ram_batt:
-		return "ROM+MNC3+RAM+BATT"
+		return "ROM+MBC3+RAM+BATT"
 	case rom_mbc5:
 		return "ROM~MBC5"
 	case rom_mbc5_ram:
@@ -301,6 +302,7 @@ func createCartridgeInfo(cartridge []byte) *cartridgeInfo {
 		Localization: localization(cartridge[0x14A]),
 		mbc1:         isMBC1(typeCode),
 		mbc2:         isMBC2(typeCode),
+		mbc3:         isMBC3(typeCode),
 	}
 }
 
@@ -322,4 +324,8 @@ func isMBC1(code cartridgeTypeCode) bool {
 
 func isMBC2(code cartridgeTypeCode) bool {
 	return code == rom_mbc2 || code == rom_mbc2_batt
+}
+
+func isMBC3(code cartridgeTypeCode) bool {
+	return code == rom_mbc3_ram || code == rom_mbc3_ram_batt
 }
