@@ -18,6 +18,14 @@ func (gb *Gameboy) Step() {
 		return
 	}
 
+	if gb.stopped {
+		gb.updateTimer(4)
+		if gb.mem.ioPorts[0x00] & 0xf < 0xf {
+			gb.stopped = false
+		}
+		return
+	}
+
 	oldPC := gb.reg.PC
 
 	instrLength, name := gb.executeInstruction()
@@ -54,6 +62,8 @@ func (gb *Gameboy) Step() {
 		}
 	} else if name == "HALT" {
 		gb.halted = true
+	} else if name == "STOP 0" {
+		gb.stopped = true
 	}
 
 	gb.updateTimer(instrLength)
@@ -181,6 +191,7 @@ func (gb *Gameboy) HandleInput(input *Input) bool {
 
 func (gb *Gameboy) handleInterrupts() bool {
 	if !gb.interruptMaster {
+		gb.mem.write8(0xFF0F, 0x0)
 		return false
 	}
 	req := gb.mem.read8(0xFF0F)

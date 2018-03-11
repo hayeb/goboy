@@ -19,6 +19,8 @@ type memory struct {
 	internalRam             [127]uint8         // 0xFF80 (127 B)
 	interruptEnableRegister uint8              // 0xFFFF (1 B)
 	memorySettings          memorySettings
+
+	depth int
 }
 
 type memorySettings struct {
@@ -293,10 +295,9 @@ func (memory *memory) handleSpecificAddress(address uint16, val uint8) bool {
 func (memory *memory) write16(address uint16, val uint16) {
 	switch mapAddr(address) {
 	case bank0:
-		memory.switchableRomBank[0][address] = uint8(val)
-		memory.switchableRomBank[0][address+1] = uint8(val >> 8)
+		fallthrough
 	case switchableRomBank:
-
+		memory.doBankingAction(address, uint8(val))
 	case videoRam:
 		memory.internalRam8kb[address-0x8000] = uint8(val)
 		memory.internalRam8kb[address-0x8000+1] = uint8(val >> 8)
@@ -312,6 +313,7 @@ func (memory *memory) doBankingAction(address uint16, val uint8) {
 	settings := memory.memorySettings
 
 	if !settings.mbc1 && !settings.mbc2 && !settings.mbc3 {
+		fmt.Println("Not performing banking?")
 		return
 	}
 
@@ -329,16 +331,21 @@ func (memory *memory) doBankingAction(address uint16, val uint8) {
 func (memory *memory) mbc1BankingAction(address uint16, val uint8) {
 	if address < 0x1FFF {
 		if val&0xA == 0xA {
+			fmt.Println("Enabling external RAM")
 			memory.memorySettings.ramEnabled = true
 		} else {
+			fmt.Println("Enabling disabling RAM")
 			memory.memorySettings.ramEnabled = false
 		}
 	} else if address >= 0x2000 && address < 0x4000 {
+		fmt.Printf("Set current ROM bank: %d\n", val & 0x1F)
 		memory.memorySettings.currentROMBank = val & 0x1F
 	} else if address >= 0x4000 && address < 0x6000 {
 		if memory.memorySettings.bankingMode == romBankingMode {
+			fmt.Printf("Set upper bits of ROM bank: %d\n", (val&0x3)<<5)
 			memory.memorySettings.currentROMBank = memory.memorySettings.currentROMBank | (val&0x3)<<5
 		} else {
+			fmt.Printf("Set RAM bank: %d\n", val & 0x3)
 			memory.memorySettings.currentRAMBank = val & 0x3
 		}
 		if memory.memorySettings.currentROMBank == 00 || memory.memorySettings.currentROMBank == 0x20 || memory.memorySettings.currentROMBank == 0x40 || memory.memorySettings.currentROMBank == 0x60 {
@@ -346,8 +353,10 @@ func (memory *memory) mbc1BankingAction(address uint16, val uint8) {
 		}
 	} else if address >= 0x6000 && address < 0x8000 {
 		if val == 0x1 {
+			fmt.Println("RAM banking mode")
 			memory.memorySettings.bankingMode = ramBankingMode
 		} else if val == 0x0 {
+			fmt.Println("ROM banking mode")
 			memory.memorySettings.bankingMode = romBankingMode
 		}
 	}
@@ -367,7 +376,7 @@ func (memory *memory) mbc2BankingAction(address uint16, val uint8) {
 }
 
 func (memory *memory) mbc3BankingAction(address uint16, val uint8) {
-
+	panic("MBC3 banking not implemented")
 }
 
 func (memory *memory) swapBootRom(cartridge []uint8) {

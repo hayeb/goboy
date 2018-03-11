@@ -2,13 +2,6 @@ package gameboy
 
 import "fmt"
 
-type flags struct {
-	Z bool
-	N bool
-	H bool
-	C bool
-}
-
 type register struct {
 	A uint8
 	B uint8
@@ -21,8 +14,6 @@ type register struct {
 
 	SP uint16
 	PC uint16
-
-	Flag flags
 }
 
 type duoRegister int
@@ -33,6 +24,54 @@ const (
 	REG_DE
 	REG_HL
 )
+
+func (reg *register) setZ(val bool) {
+	if val {
+		reg.F = setBit(reg.F, 7)
+	} else {
+		reg.F = resetBit(reg.F, 7)
+	}
+}
+
+func (reg *register) isZ() bool {
+	return (reg.F>>7)&0x1 == 1
+}
+
+func (reg *register) setN(val bool) {
+	if val {
+		reg.F = setBit(reg.F, 6)
+	} else {
+		reg.F = resetBit(reg.F, 6)
+	}
+}
+
+func (reg *register) isN() bool {
+	return (reg.F>>6)&0x1 == 1
+}
+
+func (reg *register) setH(val bool) {
+	if val {
+		reg.F = setBit(reg.F, 5)
+	} else {
+		reg.F = resetBit(reg.F, 5)
+	}
+}
+
+func (reg *register) isH() bool {
+	return (reg.F>>5)&0x1 == 1
+}
+
+func (reg *register) setC(val bool) {
+	if val {
+		reg.F = setBit(reg.F, 4)
+	} else {
+		reg.F = resetBit(reg.F, 4)
+	}
+}
+
+func (reg *register) isC() bool {
+	return (reg.F>>4)&0x1 == 1
+}
 
 func (reg *register) duoRegs(duo duoRegister) (uint8, uint8) {
 	switch duo {
@@ -89,17 +128,13 @@ func (reg *register) writeDuo(duo duoRegister, val uint16) {
 
 func (reg *register) bit(bit int, val uint8) {
 	cond := val & (1 << uint(bit))
-	if cond != 0 {
-		reg.Flag.Z = false
-	} else {
-		reg.Flag.Z = true
-	}
-	reg.Flag.N = false
-	reg.Flag.H = true
+	reg.setZ(cond == 0)
+	reg.setN(false)
+	reg.setH(true)
 }
 
 func (reg *register) incSP(n int) {
-	reg.SP = reg.SP+ uint16(n)
+	reg.SP = reg.SP + uint16(n)
 }
 
 func (reg *register) decSP(n int) {
@@ -111,6 +146,5 @@ func (reg *register) incPC(n int) {
 }
 
 func (reg *register) decPC(n int) {
-	reg.PC =reg.PC - uint16(n)
+	reg.PC = reg.PC - uint16(n)
 }
-

@@ -310,24 +310,23 @@ func bit_7_hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
 }
 
 func rl_c(_ *memory, reg *register, cbInstr *cbInstruction) int {
-	isCarrySet := reg.Flag.C
+	isCarrySet := reg.isC()
 	isMSBSet := testBit(reg.C, 7)
 
-	reg.Flag.Z = false
-	reg.Flag.N = false
-	reg.Flag.H = false
-	reg.Flag.C = false
+	reg.setZ( false)
+	reg.setN( false)
+	reg.setH( false)
 
 	newVal := reg.C << 1
 
-	reg.Flag.C = isMSBSet
+	reg.setC( isMSBSet)
 
 	if isCarrySet {
 		newVal = setBit(newVal, 0)
 	}
 
 	if newVal == 0 {
-		reg.Flag.Z = true
+		reg.setZ( true)
 	}
 	reg.C = newVal
 	reg.incPC(cbInstr.bytes)
@@ -386,10 +385,10 @@ func swapA(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	val := reg.A
 
 	reg.A = val<<4 | val>>4
-	reg.Flag.Z = reg.A == 0
-	reg.Flag.N = false
-	reg.Flag.H = false
-	reg.Flag.C = false
+	reg.setZ( reg.A == 0)
+	reg.setN( false)
+	reg.setH( false)
+	reg.setC( false)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
@@ -398,10 +397,10 @@ func swapB(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	val := reg.B
 
 	reg.B = val<<4 | val>>4
-	reg.Flag.Z = reg.B == 0
-	reg.Flag.N = false
-	reg.Flag.H = false
-	reg.Flag.C = false
+	reg.setZ( reg.B == 0)
+	reg.setN( false)
+	reg.setH( false)
+	reg.setC( false)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
@@ -410,33 +409,33 @@ func swapE(_ *memory, reg *register, cbInstr *cbInstruction) int {
 	val := reg.E
 
 	reg.E = val<<4 | val>>4
-	reg.Flag.Z = reg.E == 0
-	reg.Flag.N = false
-	reg.Flag.H = false
-	reg.Flag.C = false
+	reg.setZ( reg.E == 0)
+	reg.setN( false)
+	reg.setH( false)
+	reg.setC( false)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
 
 func slaHL(mem *memory, reg *register, cbInstr *cbInstruction) int {
 	val := mem.read8(reg.readDuo(REG_HL))
-	reg.Flag.C = val>>7 == 1
+	reg.setC( val>>7 == 1)
 	reg.A = val << 1
 
-	reg.Flag.Z = reg.A == 0
-	reg.Flag.N = false
-	reg.Flag.H = false
+	reg.setZ( reg.A == 0)
+	reg.setN( false)
+	reg.setH( false)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
 
 func slaA(_ *memory, reg *register, cbInstr *cbInstruction) int {
-	reg.Flag.C = reg.A>>7 == 1
+	reg.setC( reg.A>>7 == 1)
 	reg.A = reg.A << 1
 
-	reg.Flag.Z = reg.A == 0
-	reg.Flag.N = false
-	reg.Flag.H = false
+	reg.setZ( reg.A == 0)
+	reg.setN( false)
+	reg.setH( false)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
@@ -518,46 +517,46 @@ func set5hl(mem *memory, reg *register, cbInstr *cbInstruction) int {
 }
 
 func srlA(_ *memory, reg *register, cbInstr *cbInstruction) int {
-	reg.Flag.C = reg.A&0x1 == 1
+	reg.setC( reg.A&0x1 == 1)
 	reg.A >>= 1
 
-	reg.Flag.Z = reg.A == 0
-	reg.Flag.N = false
-	reg.Flag.H = false
+	reg.setZ( reg.A == 0)
+	reg.setN( false)
+	reg.setH( false)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
 
 func srlB(_ *memory, reg *register, cbInstr *cbInstruction) int {
-	reg.Flag.C = reg.B&0x1 == 1
+	reg.setC( reg.B&0x1 == 1)
 	reg.B >>= 1
 
-	reg.Flag.Z = reg.B == 0
-	reg.Flag.N = false
-	reg.Flag.H = false
+	reg.setZ( reg.B == 0)
+	reg.setN( false)
+	reg.setH( false)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
 
 func srlD(_ *memory, reg *register, cbInstr *cbInstruction) int {
-	reg.Flag.C = reg.D&0x1 == 1
+	reg.setC( reg.D&0x1 == 1)
 	reg.D >>= 1
 
-	reg.Flag.Z = reg.D == 0
-	reg.Flag.N = false
-	reg.Flag.H = false
+	reg.setZ( reg.D == 0)
+	reg.setN( false)
+	reg.setH( false)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
 
 
 func srlE(_ *memory, reg *register, cbInstr *cbInstruction) int {
-	reg.Flag.C = reg.E&0x1 == 1
+	reg.setC( reg.E&0x1 == 1)
 	reg.E >>= 1
 
-	reg.Flag.Z = reg.E == 0
-	reg.Flag.N = false
-	reg.Flag.H = false
+	reg.setZ( reg.E == 0)
+	reg.setN( false)
+	reg.setH( false)
 	reg.incPC(cbInstr.bytes)
 	return cbInstr.actionDuration
 }
@@ -576,17 +575,17 @@ func rrE(_ *memory, reg *register, _ *cbInstruction) int {
 
 func rotateRight(r *uint8, reg *register) int {
 	val := *r
-	carry := reg.Flag.C
+	carry := reg.isC()
 
 	reg.C = val >> 1
 	if carry {
 		setBit(reg.C, 7)
 	}
 
-	reg.Flag.Z = reg.C == 0
-	reg.Flag.N = false
-	reg.Flag.H = false
-	reg.Flag.C = reg.C&0x1 == 1
+	reg.setZ( reg.C == 0)
+	reg.setN( false)
+	reg.setH( false)
+	reg.setC( reg.C&0x1 == 1)
 	reg.incPC(2)
 	return 8
 }

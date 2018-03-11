@@ -44,6 +44,7 @@ type Gameboy struct {
 	interruptEnableScheduled  bool
 	interruptDisableScheduled bool
 	halted                    bool
+	stopped                   bool
 	bootromSwapped            bool
 }
 
@@ -54,7 +55,6 @@ func Initialize(cart []uint8, renderer *sdl.Surface, options *Options) Gameboy {
 	mem := memInit(cart, cartInfo)
 	graphics := createGraphics(mem.videoRam[:], mem.ioPorts[:], mem.spriteAttribMemory[:], renderer, options.Speed, options.Scaling)
 	registers := new(register)
-
 
 	gameboy := Gameboy{
 		cartridgeInfo:   cartInfo,

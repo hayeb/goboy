@@ -20,6 +20,8 @@ type Command struct {
 
 type Stat struct {
 	InterruptStatCommand bool `@"i"`
+	MemoryStatCommand    bool `| @"m"`
+	StackStatCommand     bool `| @"s"`
 }
 
 type Breakpoint struct {
@@ -123,6 +125,28 @@ func (debugger *Debugger) handleCommand(command Command, updateInputFunction fun
 			fmt.Printf("LCDC: %t %t\n", testBit(ieReg, 1), testBit(ifReg, 1))
 			fmt.Printf("Timer overflow: %t %t\n", testBit(ieReg, 2), testBit(ifReg, 2))
 			fmt.Printf("Serial transfer complete: %t %t\n", testBit(ieReg, 3), testBit(ifReg, 3))
+		} else if command.StatCommand.MemoryStatCommand {
+			mem := debugger.gb.mem
+
+			fmt.Printf("Memor settings:\n")
+			fmt.Printf("MBC1: %t\n", mem.memorySettings.mbc1)
+			fmt.Printf("MBC2: %t\n", mem.memorySettings.mbc2)
+			fmt.Printf("MBC3: %t\n", mem.memorySettings.mbc3)
+			if mem.memorySettings.bankingMode == romBankingMode {
+				fmt.Printf("Banking mode: ROM\n")
+			} else if mem.memorySettings.bankingMode == ramBankingMode {
+				fmt.Printf("Banking mode: RAM\n")
+			}
+			fmt.Printf("Current ROM bank: %d\n", mem.memorySettings.currentROMBank)
+			fmt.Printf("Current RAM bank: %d\n", mem.memorySettings.currentRAMBank)
+		} else if command.StatCommand.StackStatCommand {
+			mem := debugger.gb.mem
+			reg := debugger.gb.reg
+			fmt.Println("Stack dump:")
+			for i := 0; i < 10; i++ {
+				fmt.Printf("%#04x %#02x\n",reg.SP + uint16(i), mem.read8(reg.SP + uint16(i)))
+			}
+
 		}
 	} else if command.HelpCommand {
 		// TODO: Implement help
